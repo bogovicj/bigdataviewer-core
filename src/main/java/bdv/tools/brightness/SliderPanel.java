@@ -31,6 +31,7 @@ package bdv.tools.brightness;
 import java.awt.BorderLayout;
 import java.awt.Component;
 
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
@@ -41,20 +42,21 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import bdv.util.BoundedValue;
+import bdv.util.BoundedValueDouble;
 
 /**
  * A {@link JSlider} with a {@link JSpinner} next to it, both modifying the same
  * {@link BoundedValue value}.
  */
-public class SliderPanel extends JPanel implements BoundedValue.UpdateListener
+public class SliderPanel extends JPanel implements BoundedValueDouble.UpdateListener
 {
 	private static final long serialVersionUID = 6444334522127424416L;
 
-	private final JSlider slider;
+	private final JSliderDouble slider;
 
 	private final JSpinner spinner;
 
-	private final BoundedValue model;
+	private final BoundedValueDouble model;
 
 	/**
 	 * Create a {@link SliderPanel} to modify a given {@link BoundedValue value}.
@@ -64,12 +66,12 @@ public class SliderPanel extends JPanel implements BoundedValue.UpdateListener
 	 * @param model
 	 *            the value that is modified.
 	 */
-	public SliderPanel( final String name, final BoundedValue model, final int spinnerStepSize )
+	public SliderPanel( final String name, final BoundedValueDouble model, final double spinnerStepSize )
 	{
 		super();
 		setLayout( new BorderLayout( 10, 10 ) );
 
-		slider = new JSlider( SwingConstants.HORIZONTAL, model.getRangeMin(), model.getRangeMax(), model.getCurrentValue() );
+		slider = new JSliderDouble( SwingConstants.HORIZONTAL, model.getRangeMin(), model.getRangeMax(), model.getCurrentValue() );
 		spinner = new JSpinner();
 		spinner.setModel( new SpinnerNumberModel( model.getCurrentValue(), model.getRangeMin(), model.getRangeMax(), spinnerStepSize ) );
 
@@ -88,7 +90,7 @@ public class SliderPanel extends JPanel implements BoundedValue.UpdateListener
 			@Override
 			public void stateChanged( final ChangeEvent e )
 			{
-				final int value = ( ( Integer ) spinner.getValue() ).intValue();
+				final double value = (( Double )spinner.getValue()).doubleValue();
 				model.setCurrentValue( value );
 			}
 		} );
@@ -115,9 +117,9 @@ public class SliderPanel extends JPanel implements BoundedValue.UpdateListener
 	@Override
 	public void update()
 	{
-		final int value = model.getCurrentValue();
-		final int min = model.getRangeMin();
-		final int max = model.getRangeMax();
+		final double value = model.getCurrentValue();
+		final double min = model.getRangeMin();
+		final double max = model.getRangeMax();
 		if (slider.getMaximum() != max || slider.getMinimum() != min)
 		{
 			slider.setMinimum( min );
@@ -128,5 +130,132 @@ public class SliderPanel extends JPanel implements BoundedValue.UpdateListener
 		}
 		slider.setValue( value );
 		spinner.setValue( value );
+	}
+
+	public String toString()
+	{
+		final double value = model.getCurrentValue();
+		final double min = model.getRangeMin();
+		final double max = model.getRangeMax();
+		return "SliderPanel: [ " + min + " " + max + " ] : " + value;
+	}
+
+	public static class JSliderDouble extends JSlider
+	{
+		private static final long serialVersionUID = 4058697450156361851L;
+
+		double resolution;
+		double min, max, value;
+
+		public JSliderDouble( int orientation, double min, double max, double value,
+				double resolution )
+		{
+			super( orientation );
+			this.resolution = resolution;
+			this.min = min;
+			this.max = max;
+			this.value = value;
+			super.setMinimum( 0 );
+			update();
+		}
+
+		public JSliderDouble( int orientation, double min, double max, double value )
+		{
+			this( orientation, min, max, value, 0.1 );
+		}
+
+		public double getMinimumDouble()
+		{
+			return min;
+		}
+
+		public double getMaximumDouble()
+		{
+			return max;
+		}
+
+		public double getValueDouble()
+		{
+			return min + super.getValue() * resolution;
+		}
+
+		public void setMinimum( double minVal )
+		{
+			this.min = minVal;
+			update();
+		}
+
+		public void setMaximum( double maxVal )
+		{
+			this.max = maxVal;
+			update();
+		}
+
+		public void setValue( double val )
+		{
+			this.value = val;
+			update();
+		}
+
+		public void setResolution( double res )
+		{
+			this.resolution = res;
+			update();
+		}
+
+		private void update()
+		{
+			super.setMaximum( (int) ((max - min) / resolution) );
+			super.setValue( (int) ((value - min) / resolution) );
+		}
+
+		@Override
+		public void setMinimum( int minVal )
+		{
+			super.setMinimum( minVal );
+		}
+
+		@Override
+		public void setMaximum( int minVal )
+		{
+			super.setMaximum( minVal );
+		}
+
+		@Override
+		public void setValue( int minVal )
+		{
+			super.setValue( minVal );
+		}
+
+		public String toString()
+		{
+			return String.format( "JSliderDouble: [ %f : %f : %f ] : %f\n"
+					+ "Slider [ %d, %d ] : %d", min, max, resolution, getValueDouble(),
+					super.getMinimum(), super.getMaximum(), super.getValue() );
+		}
+	}
+
+	public static void main( String[] args )
+	{
+		JSliderDouble a = new JSliderDouble( SwingConstants.HORIZONTAL, 0.0, 1.0, 0.5,
+				0.1 );
+
+		// a.addChangeListener( new ChangeListener()
+		// {
+		// @Override
+		// public void stateChanged( ChangeEvent e )
+		// {
+		// System.out.println( a );
+		// }
+		// });
+
+		// System.out.println( a );
+		a.setMinimum( -1.0 );
+		// System.out.println( a );
+
+		JFrame frame = new JFrame( "SliderDemo" );
+		frame.add( a );
+		frame.pack();
+		frame.setVisible( true );
 	}
 }

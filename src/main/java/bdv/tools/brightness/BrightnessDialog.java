@@ -327,6 +327,10 @@ public class BrightnessDialog extends JDialog
 
 		private final boolean rememberSizes;
 
+		private final SliderPanelDouble minPanel;
+
+		private final SliderPanelDouble maxPanel;
+
 		public MinMaxPanel( final MinMaxGroup group, final SetupAssignments assignments, final MinMaxPanels minMaxPanels, final boolean rememberSizes )
 		{
 			super();
@@ -340,10 +344,12 @@ public class BrightnessDialog extends JDialog
 			sliders = new JPanel();
 			sliders.setLayout( new BoxLayout( sliders, BoxLayout.PAGE_AXIS ) );
 
-			final SliderPanel minPanel = new SliderPanel( "min", group.getMinBoundedValue(), 1 );
+			// set the spinner step size to be 0.01 the total range 
+			final double spinnerStep = 0.01 * ( minMaxGroup.getRangeMax() - minMaxGroup.getRangeMin() );
+			minPanel = new SliderPanelDouble( "min", group.getMinBoundedValue(), spinnerStep );
 			minPanel.setBorder( BorderFactory.createEmptyBorder( 0, 10, 10, 10 ) );
 			sliders.add( minPanel );
-			final SliderPanel maxPanel = new SliderPanel( "max", group.getMaxBoundedValue(), 1 );
+			maxPanel = new SliderPanelDouble( "max", group.getMaxBoundedValue(), spinnerStep );
 			maxPanel.setBorder( BorderFactory.createEmptyBorder( 0, 10, 10, 10 ) );
 			sliders.add( maxPanel );
 			if ( rememberSizes && ! minMaxPanels.minMaxPanels.isEmpty() )
@@ -383,43 +389,52 @@ public class BrightnessDialog extends JDialog
 			advancedPanel.setLayout( new BoxLayout( advancedPanel, BoxLayout.PAGE_AXIS ) );
 
 			final JSpinner dummy = new JSpinner();
-			dummy.setModel( new SpinnerNumberModel( minMaxGroup.getRangeMax(), minMaxGroup.getFullRangeMin(), minMaxGroup.getFullRangeMax(), 1 ) );
+			dummy.setModel( new SpinnerNumberModel( 
+					minMaxGroup.getRangeMax(), minMaxGroup.getFullRangeMin(), minMaxGroup.getFullRangeMax(), minMaxGroup.getResolution() ) );
 			dummy.setBorder( BorderFactory.createEmptyBorder( 0, 10, 10, 10 ) );
 			final Dimension ps = dummy.getPreferredSize();
 
 			final JSpinner spinnerRangeMin = new JSpinner();
-			spinnerRangeMin.setModel( new SpinnerNumberModel( minMaxGroup.getRangeMin(), Integer.MIN_VALUE, Integer.MAX_VALUE, 1 ) );
+			spinnerRangeMin.setModel( new SpinnerNumberModel( minMaxGroup.getRangeMax(), -Double.MAX_VALUE, Double.MAX_VALUE, 1 ) );
 			spinnerRangeMin.addChangeListener( new ChangeListener()
 			{
 				@Override
 				public void stateChanged( final ChangeEvent e )
 				{
-					final int value = ( ( Integer ) spinnerRangeMin.getValue() ).intValue();
+					final double value = ( ( Double ) spinnerRangeMin.getValue() ).doubleValue();
 					if ( value < minMaxGroup.getFullRangeMin() )
 						spinnerRangeMin.setValue( minMaxGroup.getFullRangeMin() );
-					else if ( value > minMaxGroup.getRangeMax() - 1 )
-						spinnerRangeMin.setValue( minMaxGroup.getRangeMax() - 1);
+					else if ( value > minMaxGroup.getRangeMax() - minMaxGroup.getResolution() )
+						spinnerRangeMin.setValue( minMaxGroup.getRangeMax() - minMaxGroup.getResolution() );
 					else
 						minMaxGroup.setRange( value, minMaxGroup.getRangeMax() );
+
+					final double spinnerStep = 0.01 * ( minMaxGroup.getRangeMax() - minMaxGroup.getRangeMin() );
+					minPanel.setSpinnerStepSize( spinnerStep );
+					maxPanel.setSpinnerStepSize( spinnerStep );
 				}
 			} );
 			spinnerRangeMin.setPreferredSize( ps );
 			spinnerRangeMin.setBorder( BorderFactory.createEmptyBorder( 0, 10, 10, 10 ) );
 
 			final JSpinner spinnerRangeMax = new JSpinner();
-			spinnerRangeMax.setModel( new SpinnerNumberModel( minMaxGroup.getRangeMax(), Integer.MIN_VALUE, Integer.MAX_VALUE, 1 ) );
+			spinnerRangeMax.setModel( new SpinnerNumberModel( minMaxGroup.getRangeMax(), -Double.MAX_VALUE, Double.MAX_VALUE, 1 ) );
 			spinnerRangeMax.addChangeListener( new ChangeListener()
 			{
 				@Override
 				public void stateChanged( final ChangeEvent e )
 				{
-					final int value = ( ( Integer ) spinnerRangeMax.getValue() ).intValue();
-					if ( value < minMaxGroup.getRangeMin() + 1 )
-						spinnerRangeMax.setValue( minMaxGroup.getRangeMin() + 1 );
+					final double value = ( ( Double ) spinnerRangeMax.getValue() ).doubleValue();
+					if ( value < minMaxGroup.getRangeMin() + minMaxGroup.getResolution() )
+						spinnerRangeMax.setValue( minMaxGroup.getRangeMin() + minMaxGroup.getResolution() );
 					else if ( value > minMaxGroup.getFullRangeMax() )
 						spinnerRangeMax.setValue( minMaxGroup.getFullRangeMax() );
 					else
 						minMaxGroup.setRange( minMaxGroup.getRangeMin(), value );
+
+					final double spinnerStep = 0.01 * ( minMaxGroup.getRangeMax() - minMaxGroup.getRangeMin() );
+					minPanel.setSpinnerStepSize( spinnerStep );
+					maxPanel.setSpinnerStepSize( spinnerStep );
 				}
 			} );
 			spinnerRangeMax.setPreferredSize( ps );

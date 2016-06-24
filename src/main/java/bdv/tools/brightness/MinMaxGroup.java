@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import bdv.util.BoundedInterval;
+import bdv.util.BoundedRealInterval;
 import bdv.util.BoundedValue;
 
 /**
@@ -51,11 +52,13 @@ import bdv.util.BoundedValue;
  *
  * @author Tobias Pietzsch &lt;tobias.pietzsch@gmail.com&gt;
  */
-public class MinMaxGroup extends BoundedInterval
+public class MinMaxGroup extends BoundedRealInterval
 {
-	private final int fullRangeMin;
+	private final double fullRangeMin;
 
-	private final int fullRangeMax;
+	private final double fullRangeMax;
+
+	private final double resolution = 0.1;
 
 	final Set< ConverterSetup > setups;
 
@@ -66,9 +69,9 @@ public class MinMaxGroup extends BoundedInterval
 
 	private UpdateListener updateListener;
 
-	public MinMaxGroup( final int fullRangeMin, final int fullRangeMax, final int rangeMin, final int rangeMax, final int currentMin, final int currentMax )
+	public MinMaxGroup( final double fullRangeMin, final double fullRangeMax, final double rangeMin, final double rangeMax, final double currentMin, final double currentMax )
 	{
-		super( rangeMin, rangeMax, currentMin, currentMax, 2 );
+		super( rangeMin, rangeMax, currentMin, currentMax, 0.01 );
 		this.fullRangeMin = fullRangeMin;
 		this.fullRangeMax = fullRangeMax;
 		setups = new LinkedHashSet< ConverterSetup >();
@@ -76,20 +79,25 @@ public class MinMaxGroup extends BoundedInterval
 	}
 
 	@Override
-	protected void updateInterval( final int min, final int max )
+	protected void updateInterval( final double min, final double max )
 	{
 		for ( final ConverterSetup setup : setups )
 			setup.setDisplayRange( min, max );
 	}
 
-	public int getFullRangeMin()
+	public double getFullRangeMin()
 	{
 		return fullRangeMin;
 	}
 
-	public int getFullRangeMax()
+	public double getFullRangeMax()
 	{
 		return fullRangeMax;
+	}
+
+	public double getResolution()
+	{
+		return resolution;
 	}
 
 	/**
@@ -131,5 +139,10 @@ public class MinMaxGroup extends BoundedInterval
 	public void setUpdateListener( final UpdateListener l )
 	{
 		updateListener = l;
+	}
+
+	public String toString()
+	{
+		return "MinMaxGroup: " + fullRangeMin + "  " + fullRangeMax + " : ( " + resolution + " )";
 	}
 }

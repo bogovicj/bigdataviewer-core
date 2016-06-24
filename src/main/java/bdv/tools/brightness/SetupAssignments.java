@@ -68,9 +68,9 @@ public class SetupAssignments
 	 */
 	private final Map< ConverterSetup, MinMaxGroup > setupToGroup;
 
-	private final int fullRangeMin;
+	private final double fullRangeMin;
 
-	private final int fullRangeMax;
+	private final double fullRangeMax;
 
 	public interface UpdateListener
 	{
@@ -85,7 +85,7 @@ public class SetupAssignments
 	 * @param fullRangeMin
 	 * @param fullRangeMax
 	 */
-	public SetupAssignments( final ArrayList< ConverterSetup > converterSetups, final int fullRangeMin, final int fullRangeMax )
+	public SetupAssignments( final ArrayList< ConverterSetup > converterSetups, final double fullRangeMin, final double fullRangeMax )
 	{
 		setups = new ArrayList< ConverterSetup >( converterSetups );
 		minMaxGroups = new ArrayList< MinMaxGroup >();
@@ -94,8 +94,9 @@ public class SetupAssignments
 		this.fullRangeMax = fullRangeMax;
 		for ( final ConverterSetup setup : setups )
 		{
-			final int displayRangeMin = Math.max( fullRangeMin, Math.min( fullRangeMax, ( int ) setup.getDisplayRangeMin() ) );
-			final int displayRangeMax = Math.max( fullRangeMin, Math.min( fullRangeMax, ( int ) setup.getDisplayRangeMax() ) );
+			final double displayRangeMin = Math.max( fullRangeMin, Math.min( fullRangeMax, setup.getDisplayRangeMin() ) );
+			final double displayRangeMax = Math.max( fullRangeMin, Math.min( fullRangeMax, setup.getDisplayRangeMax() ) );
+			System.out.println( "SetupAssignments range: " + displayRangeMin + " " + displayRangeMax );
 			if ( setup.getDisplayRangeMin() != displayRangeMin || setup.getDisplayRangeMax() != displayRangeMax )
 				setup.setDisplayRange( displayRangeMin, displayRangeMax );
 			final MinMaxGroup group = new MinMaxGroup( fullRangeMin, fullRangeMax, fullRangeMin, fullRangeMax, displayRangeMin, displayRangeMax );
@@ -238,12 +239,12 @@ public class SetupAssignments
 			final MinMaxGroup group = minMaxGroups.get( i );
 			final Element elemMinMaxGroup = new Element( "MinMaxGroup" );
 			elemMinMaxGroup.addContent( XmlHelpers.intElement( "id", i ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "fullRangeMin", group.getFullRangeMin() ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "fullRangeMax", group.getFullRangeMax() ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "rangeMin", group.getRangeMin() ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "rangeMax", group.getRangeMax() ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "currentMin", group.getMinBoundedValue().getCurrentValue() ) );
-			elemMinMaxGroup.addContent( XmlHelpers.intElement( "currentMax", group.getMaxBoundedValue().getCurrentValue() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "fullRangeMin", group.getFullRangeMin() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "fullRangeMax", group.getFullRangeMax() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "rangeMin", group.getRangeMin() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "rangeMax", group.getRangeMax() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "currentMin", group.getMinBoundedValue().getCurrentValue() ) );
+			elemMinMaxGroup.addContent( XmlHelpers.doubleElement( "currentMax", group.getMaxBoundedValue().getCurrentValue() ) );
 			elemMinMaxGroups.addContent( elemMinMaxGroup );
 		}
 		elem.addContent( elemMinMaxGroups );

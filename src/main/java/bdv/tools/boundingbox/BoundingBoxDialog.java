@@ -54,6 +54,7 @@ import bdv.viewer.SourceAndConverter;
 import bdv.viewer.ViewerPanel;
 import bdv.viewer.VisibilityAndGrouping;
 import net.imglib2.Interval;
+import net.imglib2.RealInterval;
 import net.imglib2.display.RealARGBColorConverter;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.type.numeric.ARGBType;
@@ -96,7 +97,7 @@ public class BoundingBoxDialog extends JDialog
 			final SetupAssignments setupAssignments,
 			final int boxSetupId,
 			final Interval initialInterval,
-			final Interval rangeInterval,
+			final RealInterval rangeInterval,
 			final boolean showBoxSource,
 			final boolean showBoxOverlay )
 	{
@@ -143,7 +144,7 @@ public class BoundingBoxDialog extends JDialog
 			{
 				return boxRealRandomAccessible.getInterval();
 			}
-		} );
+		});
 
 		// create a JPanel with sliders to modify the bounding box interval (boxRealRandomAccessible.getInterval())
 		boxSelectionPanel = new BoxSelectionPanel( boxRealRandomAccessible.getInterval(), rangeInterval );

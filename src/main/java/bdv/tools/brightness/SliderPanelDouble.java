@@ -63,6 +63,8 @@ public class SliderPanelDouble extends JPanel implements BoundedValueDouble.Upda
 
 	private double dmax;
 
+	private SpinnerNumberModel spinnerModel;
+
 	/**
 	 * Create a {@link SliderPanelDouble} to modify a given {@link BoundedValueDouble value}.
 	 *
@@ -78,6 +80,7 @@ public class SliderPanelDouble extends JPanel implements BoundedValueDouble.Upda
 			final double spinnerStepSize )
 	{
 		super();
+		super.setName( name );
 		setLayout( new BorderLayout( 10, 10 ) );
 
 		dmin = model.getRangeMin();
@@ -85,7 +88,8 @@ public class SliderPanelDouble extends JPanel implements BoundedValueDouble.Upda
 
 		slider = new JSlider( SwingConstants.HORIZONTAL, 0, sliderLength, toSlider( model.getCurrentValue() ) );
 		spinner = new JSpinner();
-		spinner.setModel( new SpinnerNumberModel( model.getCurrentValue(), dmin, dmax, spinnerStepSize ) );
+		spinnerModel = new SpinnerNumberModel( model.getCurrentValue(), dmin, dmax, spinnerStepSize );
+		spinner.setModel( spinnerModel );
 
 		slider.addChangeListener( new ChangeListener()
 		{
@@ -121,6 +125,11 @@ public class SliderPanelDouble extends JPanel implements BoundedValueDouble.Upda
 		model.setUpdateListener( this );
 	}
 
+	public void setSpinnerStepSize( double spinnerStepSize )
+	{
+		spinnerModel.setStepSize( spinnerStepSize );
+	}
+
 	public void setDecimalFormat( final String pattern )
 	{
 		( ( JSpinner.NumberEditor ) spinner.getEditor() ).getFormat().applyPattern( pattern );
@@ -145,8 +154,10 @@ public class SliderPanelDouble extends JPanel implements BoundedValueDouble.Upda
 			spinnerModel.setMinimum( min );
 			spinnerModel.setMaximum( max );
 		}
+
 		slider.setValue( toSlider( value ) );
 		spinner.setValue( value );
+		//System.out.println("SliderPanelDouble " + getName() + " : " + min + " " + max + " : " + value );
 	}
 
 	private int toSlider( final double value )
