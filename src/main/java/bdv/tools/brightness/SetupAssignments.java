@@ -86,9 +86,9 @@ public class SetupAssignments
 
 	private UpdateListener updateListener;
 
-	public SetupAssignments( final ArrayList< ConverterSetup > converterSetups, final double fullRangeMin, final double fullRangeMax )
+	public SetupAssignments( final ArrayList< ConverterSetup > converterSetups, final double defaultRangeMin, final double defaultRangeMax )
 	{
-		this( converterSetups, fullRangeMin, fullRangeMax, fullRangeMin, fullRangeMax );
+		this( converterSetups, Integer.MIN_VALUE, Integer.MAX_VALUE, defaultRangeMin, defaultRangeMax );
 	}
 
 	/**
