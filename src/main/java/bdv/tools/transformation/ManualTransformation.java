@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -63,7 +64,7 @@ public class ManualTransformation
 	public Element toXml()
 	{
 		final List< TransformedSource< ? > > sources = getTransformedSources();
-		final ArrayList< AffineTransform3D > transforms = new ArrayList< AffineTransform3D >( sources.size() );
+		final ArrayList< AffineTransform3D > transforms = new ArrayList<>( sources.size() );
 		for ( final TransformedSource< ? > s : sources )
 		{
 			final AffineTransform3D t = new AffineTransform3D();
@@ -87,7 +88,7 @@ public class ManualTransformation
 
 	private ArrayList< TransformedSource< ? > > getTransformedSources()
 	{
-		final ArrayList< TransformedSource< ? > > list = new ArrayList< TransformedSource< ? > >();
+		final ArrayList< TransformedSource< ? > > list = new ArrayList<>();
 		final List< ? extends SourceAndConverter< ? > > sourceList = ( sources != null )
 				? sources
 				: viewer.getState().getSources();

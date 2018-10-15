@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,6 +34,18 @@ package bdv.viewer;
  */
 public enum Interpolation
 {
-	NEARESTNEIGHBOR,
-	NLINEAR
+	NEARESTNEIGHBOR( "nearest-neighbor interpolation" ),
+	NLINEAR( "tri-linear interpolation" );
+
+	private final String name;
+
+	private Interpolation( final String name )
+	{
+		this.name = name;
+	}
+
+	public String getName()
+	{
+		return name;
+	}
 }

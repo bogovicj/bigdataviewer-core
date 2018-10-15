@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -71,7 +72,7 @@ public class IntervalBoundingBox
 	 */
 	public static List< RealLocalizable > getCorners( final RealInterval interval )
 	{
-		final ArrayList< RealLocalizable > corners = new ArrayList< RealLocalizable >();
+		final ArrayList< RealLocalizable > corners = new ArrayList<>();
 		final int n = interval.numDimensions();
 		final int[] tmp = new int[ n ];
 		Arrays.fill( tmp, 2 );

@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,27 +29,30 @@
  */
 package bdv.img.cache;
 
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.SoftReference;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Callable;
 
-import net.imglib2.img.basictypeaccess.volatiles.VolatileAccess;
-import bdv.img.cache.CacheIoTiming.IoStatistics;
-import bdv.img.cache.CacheIoTiming.IoTimeBudget;
-import bdv.img.cache.VolatileImgCells.CellCache;
+import bdv.cache.CacheControl;
+import net.imglib2.cache.Cache;
+import net.imglib2.cache.CacheLoader;
+import net.imglib2.cache.LoaderCache;
+import net.imglib2.cache.queue.BlockingFetchQueues;
+import net.imglib2.cache.queue.FetcherThreads;
+import net.imglib2.cache.ref.SoftRefLoaderCache;
+import net.imglib2.cache.ref.WeakRefVolatileCache;
+import net.imglib2.cache.util.KeyBimap;
+import net.imglib2.cache.volatiles.CacheHints;
+import net.imglib2.cache.volatiles.UncheckedVolatileCache;
+import net.imglib2.img.cell.Cell;
+import net.imglib2.img.cell.CellGrid;
+import net.imglib2.type.NativeType;
 
-public class VolatileGlobalCellCache implements Cache
+public class VolatileGlobalCellCache implements CacheControl
 {
-	private final int maxNumTimepoints;
-
-	private final int maxNumSetups;
-
-	private final int maxNumLevels;
-
-	class Key
+	/**
+	 * Key for a cell identified by timepoint, setup, level, and index
+	 * (flattened spatial coordinate).
+	 */
+	public static class Key
 	{
 		private final int timepoint;
 
@@ -56,17 +60,34 @@ public class VolatileGlobalCellCache implements Cache
 
 		private final int level;
 
-		private final int index;
+		private final long index;
 
-		public Key( final int timepoint, final int setup, final int level, final int index )
+		/**
+		 * Create a Key for the specified cell. Note that {@code cellDims} and
+		 * {@code cellMin} are not used for {@code hashcode()/equals()}.
+		 *
+		 * @param timepoint
+		 *            timepoint coordinate of the cell
+		 * @param setup
+		 *            setup coordinate of the cell
+		 * @param level
+		 *            level coordinate of the cell
+		 * @param index
+		 *            index of the cell (flattened spatial coordinate of the
+		 *            cell)
+		 */
+		public Key( final int timepoint, final int setup, final int level, final long index )
 		{
 			this.timepoint = timepoint;
 			this.setup = setup;
 			this.level = level;
 			this.index = index;
 
-			final long value = ( ( index * maxNumLevels + level ) * maxNumSetups + setup ) * maxNumTimepoints + timepoint;
-			hashcode = ( int ) ( value ^ ( value >>> 32 ) );
+			int value = Long.hashCode( index );
+			value = 31 * value + level;
+			value = 31 * value + setup;
+			value = 31 * value + timepoint;
+			hashcode = value;
 		}
 
 		@Override
@@ -77,7 +98,7 @@ public class VolatileGlobalCellCache implements Cache
 			if ( !( other instanceof VolatileGlobalCellCache.Key ) )
 				return false;
 			final Key that = ( Key ) other;
-			return ( this.timepoint == that.timepoint ) && ( this.setup == that.setup ) && ( this.level == that.level ) && ( this.index == that.index );
+			return ( this.index == that.index ) && ( this.timepoint == that.timepoint ) && ( this.setup == that.setup ) && ( this.level == that.level );
 		}
 
 		final int hashcode;
@@ -89,519 +110,48 @@ public class VolatileGlobalCellCache implements Cache
 		}
 	}
 
-	class Entry< A extends VolatileAccess >
-	{
-		private final Key key;
+	private final BlockingFetchQueues< Callable< ? > > queue;
 
-		private VolatileCell< A > data;
-
-		private final CacheArrayLoader< A > loader;
-
-		/**
-		 * When was this entry last enqueued for loading (see
-		 * {@link VolatileGlobalCellCache#currentQueueFrame}). This is initialized
-		 * to -1. When the entry's data becomes valid, it is set to
-		 * {@link Long#MAX_VALUE}.
-		 */
-		private long enqueueFrame;
-
-		public Entry( final Key key, final VolatileCell< A > data, final CacheArrayLoader< A > loader )
-		{
-			this.key = key;
-			this.data = data;
-			this.loader = loader;
-			enqueueFrame = -1;
-		}
-
-		private void loadIfNotValid() throws InterruptedException
-		{
-			if ( !data.getData().isValid() )
-			{
-				final int[] cellDims = data.getDimensions();
-				final long[] cellMin = data.getMin();
-				final int timepoint = key.timepoint;
-				final int setup = key.setup;
-				final int level = key.level;
-				synchronized ( this )
-				{
-					if ( !data.getData().isValid() )
-					{
-						final VolatileCell< A > cell = new VolatileCell< A >( cellDims, cellMin, loader.loadArray( timepoint, setup, level, cellDims, cellMin ) );
-						data = cell;
-						enqueueFrame = Long.MAX_VALUE;
-						softReferenceCache.put( key, new MySoftReference( this, finalizeQueue ) );
-						notifyAll();
-					}
-				}
-			}
-		}
-	}
-
-	interface GetKey< K >
-	{
-		public K getKey();
-	}
-
-	class MySoftReference extends SoftReference< Entry< ? > > implements GetKey< Key >
-	{
-		private final Key key;
-
-		public MySoftReference( final Entry< ? > referent, final ReferenceQueue< ? super Entry< ? > > q )
-		{
-			super( referent, q );
-			key = referent.key;
-		}
-
-		@Override
-		public Key getKey()
-		{
-			return key;
-		}
-	}
-
-	class MyWeakReference extends WeakReference< Entry< ? > > implements GetKey< Key >
-	{
-		private final Key key;
-
-		public MyWeakReference( final Entry< ? > referent, final ReferenceQueue< ? super Entry< ? > > q )
-		{
-			super( referent, q );
-			key = referent.key;
-		}
-
-		@Override
-		public Key getKey()
-		{
-			return key;
-		}
-	}
-
-	protected static final int MAX_PER_FRAME_FINALIZE_ENTRIES = 500;
-
-	protected void finalizeRemovedCacheEntries()
-	{
-		synchronized ( softReferenceCache )
-		{
-			for ( int i = 0; i < MAX_PER_FRAME_FINALIZE_ENTRIES; ++i )
-			{
-				final Reference< ? extends Entry< ? > > poll = finalizeQueue.poll();
-				if ( poll == null )
-					break;
-				@SuppressWarnings( "unchecked" )
-				final Key key = ( ( GetKey< Key > ) poll ).getKey();
-				final Reference< Entry< ? > > ref = softReferenceCache.get( key );
-				if ( ref == poll )
-					softReferenceCache.remove( key );
-			}
-		}
-	}
-
-	protected final ConcurrentHashMap< Key, Reference< Entry< ? > > > softReferenceCache = new ConcurrentHashMap< Key, Reference< Entry< ? > > >();
-
-	protected final ReferenceQueue< Entry< ? > > finalizeQueue = new ReferenceQueue< Entry< ? > >();
-
-	protected final BlockingFetchQueues< Key > queue;
-
-	protected volatile long currentQueueFrame = 0;
-
-	class Fetcher extends Thread
-	{
-		@Override
-		public final void run()
-		{
-			Key key = null;
-			while ( true )
-			{
-				while ( key == null )
-					try
-					{
-						key = queue.take();
-					}
-					catch ( final InterruptedException e )
-					{}
-				long waitMillis = pauseUntilTimeMillis - System.currentTimeMillis();
-				while ( waitMillis > 0 )
-				{
-					try
-					{
-						synchronized ( lock )
-						{
-							lock.wait( waitMillis );
-						}
-					}
-					catch ( final InterruptedException e )
-					{}
-					waitMillis = pauseUntilTimeMillis - System.currentTimeMillis();
-				}
-				try
-				{
-					loadIfNotValid( key );
-					key = null;
-				}
-				catch ( final InterruptedException e )
-				{}
-			}
-		}
-
-		private final Object lock = new Object();
-
-		private volatile long pauseUntilTimeMillis = 0;
-
-		public void pauseUntil( final long timeMillis )
-		{
-			pauseUntilTimeMillis = timeMillis;
-			interrupt();
-		}
-
-		public void wakeUp()
-		{
-			pauseUntilTimeMillis = 0;
-			synchronized ( lock )
-			{
-				lock.notify();
-			}
-		}
-	}
+	protected final LoaderCache< Key, Cell< ? > > backingCache;
 
 	/**
-	 * pause all {@link Fetcher} threads for the specified number of milliseconds.
-	 */
-	public void pauseFetcherThreadsFor( final long ms )
-	{
-		pauseFetcherThreadsUntil( System.currentTimeMillis() + ms );
-	}
-
-	/**
-	 * pause all {@link Fetcher} threads until the given time (see
-	 * {@link System#currentTimeMillis()}).
-	 */
-	public void pauseFetcherThreadsUntil( final long timeMillis )
-	{
-		for ( final Fetcher f : fetchers )
-			f.pauseUntil( timeMillis );
-	}
-
-	/**
-	 * Wake up all Fetcher threads immediately. This ends any
-	 * {@link #pauseFetcherThreadsFor(long)} and
-	 * {@link #pauseFetcherThreadsUntil(long)} set earlier.
-	 */
-	public void wakeFetcherThreads()
-	{
-		for ( final Fetcher f : fetchers )
-			f.wakeUp();
-	}
-
-	private final ArrayList< Fetcher > fetchers;
-
-	private final CacheIoTiming cacheIoTiming;
-
-	/**
+	 * Create a new global cache with a new fetch queue served by the specified
+	 * number of fetcher threads.
 	 *
-	 * @param maxNumTimepoints
-	 *            the highest occurring timepoint id plus 1. This is only used to
-	 *            compute a hashcode, thus it can be initialized with a best
-	 *            guess if necessary.
-	 * @param maxNumSetups
-	 *            the highest occurring setup id plus 1. This is only used to
-	 *            compute a hashcode, thus it can be initialized with a best
-	 *            guess if necessary.
 	 * @param maxNumLevels
 	 *            the highest occurring mipmap level plus 1.
 	 * @param numFetcherThreads
+	 *            how many threads should be created to load data.
 	 */
-	public VolatileGlobalCellCache( final int maxNumTimepoints, final int maxNumSetups, final int maxNumLevels, final int numFetcherThreads )
+	public VolatileGlobalCellCache( final int maxNumLevels, final int numFetcherThreads )
 	{
-		this.maxNumTimepoints = maxNumTimepoints;
-		this.maxNumSetups = maxNumSetups;
-		this.maxNumLevels = maxNumLevels;
-
-		cacheIoTiming = new CacheIoTiming();
-		queue = new BlockingFetchQueues< Key >( maxNumLevels );
-		fetchers = new ArrayList< Fetcher >();
-		for ( int i = 0; i < numFetcherThreads; ++i )
-		{
-			final Fetcher f = new Fetcher();
-			f.setDaemon( true );
-			f.setName( "Fetcher-" + i );
-			fetchers.add( f );
-			f.start();
-		}
+		queue = new BlockingFetchQueues<>( maxNumLevels );
+		new FetcherThreads( queue, numFetcherThreads );
+		backingCache = new SoftRefLoaderCache<>();
 	}
 
 	/**
-	 * Load the data for the {@link VolatileCell} referenced by k, if
-	 * <ul>
-	 * <li>the {@link VolatileCell} is in the cache, and
-	 * <li>the data is not yet loaded (valid).
-	 * </ul>
+	 * Create a new global cache with the specified fetch queue. (It is the
+	 * callers responsibility to create fetcher threads that serve the queue.)
 	 *
-	 * @param k
-	 * @throws InterruptedException
+	 * @param queue
+	 *            queue to which asynchronous data loading jobs are submitted
 	 */
-	protected void loadIfNotValid( final Key k ) throws InterruptedException
+	public VolatileGlobalCellCache( final BlockingFetchQueues< Callable< ? > > queue )
 	{
-		final Reference< Entry< ? > > ref = softReferenceCache.get( k );
-		if ( ref != null )
-		{
-			final Entry< ? > entry = ref.get();
-			if ( entry != null )
-				loadEntryIfNotValid( entry );
-		}
+		this.queue = queue;
+		backingCache = new SoftRefLoaderCache<>();
 	}
 
 	/**
-	 * Load the data for the {@link Entry}, if it is not yet loaded (valid).
-	 * @throws InterruptedException
-	 */
-	protected void loadEntryIfNotValid( final Entry< ? > entry ) throws InterruptedException
-	{
-		entry.loadIfNotValid();
-	}
-
-	/**
-	 * Enqueue the {@link Entry} if it hasn't been enqueued for this frame
-	 * already.
-	 */
-	protected void enqueueEntry( final Entry< ? > entry, final int priority, final boolean enqueuToFront )
-	{
-		if ( entry.enqueueFrame < currentQueueFrame )
-		{
-			entry.enqueueFrame = currentQueueFrame;
-			final Key k = entry.key;
-			queue.put( k, priority, enqueuToFront );
-		}
-	}
-
-	/**
-	 * Load the data for the {@link Entry} if it is not yet loaded (valid) and
-	 * there is enough {@link IoTimeBudget} left. Otherwise, enqueue the
-	 * {@link Entry} if it hasn't been enqueued for this frame already.
-	 */
-	protected void loadOrEnqueue( final Entry< ? > entry, final int priority, final boolean enqueuToFront )
-	{
-		final IoStatistics stats = cacheIoTiming.getThreadGroupIoStatistics();
-		final IoTimeBudget budget = stats.getIoTimeBudget();
-		final long timeLeft = budget.timeLeft( priority );
-		if ( timeLeft > 0 )
-		{
-			synchronized ( entry )
-			{
-				if ( entry.data.getData().isValid() )
-					return;
-				enqueueEntry( entry, priority, enqueuToFront );
-				final long t0 = stats.getIoNanoTime();
-				stats.start();
-				try
-				{
-					entry.wait( timeLeft  / 1000000l, 1 );
-				}
-				catch ( final InterruptedException e )
-				{}
-				stats.stop();
-				final long t = stats.getIoNanoTime() - t0;
-				budget.use( t, priority );
-			}
-		}
-		else
-			enqueueEntry( entry, priority, enqueuToFront );
-	}
-
-	/**
-	 * Get a cell if it is in the cache or null. Note, that a cell being in the
-	 * cache only means that there is a data array, but not necessarily that the
-	 * data has already been loaded.
-	 *
-	 * If the cell data has not been loaded, do the following, depending on the
-	 * {@link LoadingStrategy}:
-	 * <ul>
-	 *   <li> {@link LoadingStrategy#VOLATILE}:
-	 *        Enqueue the cell for asynchronous loading by a fetcher thread, if
-	 *        it has not been enqueued in the current frame already.
-	 *   <li> {@link LoadingStrategy#BLOCKING}:
-	 *        Load the cell data immediately.
-	 *   <li> {@link LoadingStrategy#BUDGETED}:
-	 *        Load the cell data immediately if there is enough
-	 *        {@link IoTimeBudget} left for the current thread group.
-	 *        Otherwise enqueue for asynchronous loading, if it has not been
-	 *        enqueued in the current frame already.
-	 *   <li> {@link LoadingStrategy#DONTLOAD}:
-	 *        Do nothing.
-	 * </ul>
-	 *
-	 * @param timepoint
-	 *            timepoint coordinate of the cell
-	 * @param setup
-	 *            setup coordinate of the cell
-	 * @param level
-	 *            level coordinate of the cell
-	 * @param index
-	 *            index of the cell (flattened spatial coordinate of the cell)
-	 * @param cacheHints
-	 *            {@link LoadingStrategy}, queue priority, and queue order.
-	 * @return a cell with the specified coordinates or null.
-	 */
-	public VolatileCell< ? > getGlobalIfCached( final int timepoint, final int setup, final int level, final int index, final CacheHints cacheHints )
-	{
-		final Key k = new Key( timepoint, setup, level, index );
-		final Reference< Entry< ? > > ref = softReferenceCache.get( k );
-		if ( ref != null )
-		{
-			final Entry< ? > entry = ref.get();
-			if ( entry != null )
-			{
-				switch ( cacheHints.getLoadingStrategy() )
-				{
-				case VOLATILE:
-				default:
-					enqueueEntry( entry, cacheHints.getQueuePriority(), cacheHints.isEnqueuToFront() );
-					break;
-				case BLOCKING:
-					while ( true )
-						try
-						{
-							loadEntryIfNotValid( entry );
-							break;
-						}
-						catch ( final InterruptedException e )
-						{}
-					break;
-				case BUDGETED:
-					if ( !entry.data.getData().isValid() )
-						loadOrEnqueue( entry, cacheHints.getQueuePriority(), cacheHints.isEnqueuToFront() );
-					break;
-				case DONTLOAD:
-					break;
-				}
-				return entry.data;
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Create a new cell with the specified coordinates, if it isn't in the
-	 * cache already. Depending on the {@link LoadingStrategy}, do the
-	 * following:
-	 * <ul>
-	 *   <li> {@link LoadingStrategy#VOLATILE}:
-	 *        Enqueue the cell for asynchronous loading by a fetcher thread.
-	 *   <li> {@link LoadingStrategy#BLOCKING}:
-	 *        Load the cell data immediately.
-	 *   <li> {@link LoadingStrategy#BUDGETED}:
-	 *        Load the cell data immediately if there is enough
-	 *        {@link IoTimeBudget} left for the current thread group.
-	 *        Otherwise enqueue for asynchronous loading.
-	 *   <li> {@link LoadingStrategy#DONTLOAD}:
-	 *        Do nothing.
-	 * </ul>
-	 *
-	 * @param cellDims
-	 *            dimensions of the cell in pixels
-	 * @param cellMin
-	 *            minimum spatial coordinates of the cell in pixels
-	 * @param timepoint
-	 *            timepoint coordinate of the cell
-	 * @param setup
-	 *            setup coordinate of the cell
-	 * @param level
-	 *            level coordinate of the cell
-	 * @param index
-	 *            index of the cell (flattened spatial coordinate of the cell)
-	 * @param cacheHints
-	 *            {@link LoadingStrategy}, queue priority, and queue order.
-	 * @return a cell with the specified coordinates.
-	 */
-	public < A extends VolatileAccess > VolatileCell< ? > createGlobal( final int[] cellDims, final long[] cellMin, final int timepoint, final int setup, final int level, final int index, final CacheHints cacheHints, final CacheArrayLoader< A > loader )
-	{
-		final Key k = new Key( timepoint, setup, level, index );
-		Entry< ? > entry = null;
-
-		synchronized ( softReferenceCache )
-		{
-			final Reference< Entry< ? > > ref = softReferenceCache.get( k );
-			if ( ref != null )
-				entry = ref.get();
-
-			if ( entry == null )
-			{
-				final VolatileCell< A > cell = new VolatileCell< A >( cellDims, cellMin, loader.emptyArray( cellDims ) );
-				entry = new Entry< A >( k, cell, loader );
-				softReferenceCache.put( k, new MyWeakReference( entry, finalizeQueue ) );
-			}
-		}
-
-		switch ( cacheHints.getLoadingStrategy() )
-		{
-		case VOLATILE:
-		default:
-			enqueueEntry( entry, cacheHints.getQueuePriority(), cacheHints.isEnqueuToFront() );
-			break;
-		case BLOCKING:
-			while ( true )
-				try
-				{
-					loadEntryIfNotValid( entry );
-					break;
-				}
-				catch ( final InterruptedException e )
-				{}
-			break;
-		case BUDGETED:
-			if ( !entry.data.getData().isValid() )
-				loadOrEnqueue( entry, cacheHints.getQueuePriority(), cacheHints.isEnqueuToFront() );
-			break;
-		case DONTLOAD:
-			break;
-		}
-		return entry.data;
-	}
-
-	/**
-	 * Prepare the cache for providing data for the "next frame":
-	 * <ul>
-	 * <li>the contents of fetch queues is moved to the prefetch.
-	 * <li>some cleaning up of garbage collected entries ({@link #finalizeRemovedCacheEntries()}).
-	 * <li>the internal frame counter is incremented, which will enable
-	 * previously enqueued requests to be enqueued again for the new frame.
-	 * </ul>
+	 * Prepare the cache for providing data for the "next frame",
+	 * by moving pending cell request to the prefetch queue
+	 * ({@link BlockingFetchQueues#clearToPrefetch()}).
 	 */
 	@Override
 	public void prepareNextFrame()
 	{
-		queue.clear();
-		finalizeRemovedCacheEntries();
-		++currentQueueFrame;
-	}
-
-	/**
-	 * (Re-)initialize the IO time budget, that is, the time that can be spent
-	 * in blocking IO per frame/
-	 *
-	 * @param partialBudget
-	 *            Initial budget (in nanoseconds) for priority levels 0 through
-	 *            <em>n</em>. The budget for level <em>i&gt;j</em> must always be
-	 *            smaller-equal the budget for level <em>j</em>. If <em>n</em>
-	 *            is smaller than the maximum number of mipmap levels, the
-	 *            remaining priority levels are filled up with budget[n].
-	 */
-	@Override
-	public void initIoTimeBudget( final long[] partialBudget )
-	{
-		final IoStatistics stats = cacheIoTiming.getThreadGroupIoStatistics();
-		if ( stats.getIoTimeBudget() == null )
-			stats.setIoTimeBudget( new IoTimeBudget( maxNumLevels ) );
-		stats.getIoTimeBudget().reset( partialBudget );
-	}
-
-	/**
-	 * Get the {@link CacheIoTiming} that provides per thread-group IO
-	 * statistics and budget.
-	 */
-	@Override
-	public CacheIoTiming getCacheIoTiming()
-	{
-		return cacheIoTiming;
+		queue.clearToPrefetch();
 	}
 
 	/**
@@ -610,53 +160,85 @@ public class VolatileGlobalCellCache implements Cache
 	 */
 	public void clearCache()
 	{
-		for ( final Reference< Entry< ? > > ref : softReferenceCache.values() )
-			ref.clear();
-		softReferenceCache.clear();
-		prepareNextFrame();
-		// TODO: add a full clear to BlockingFetchQueues.
-		// (BlockingFetchQueues.clear() moves stuff to the prefetchQueue.)
+		backingCache.invalidateAll();
+		queue.clear();
+		backingCache.invalidateAll();
 	}
 
-	public class VolatileCellCache< A extends VolatileAccess > implements CellCache< A >
+	/**
+	 * <em>For internal use.</em>
+	 * <p>
+	 * Get the {@link LoadingVolatileCache} that handles cell loading. This is
+	 * used by bigdataviewer-server to directly issue Cell requests without
+	 * having {@link CellImg}s and associated {@link VolatileCellCache}s.
+	 *
+	 * @return the cache that handles cell loading
+	 */
+	// TODO
+//	public LoadingVolatileCache< Key, Cell< ? > > getLoadingVolatileCache()
+//	{
+//		return volatileCache;
+//	}
+
+	/**
+	 * Create a {@link VolatileCachedCellImg} backed by this {@link VolatileGlobalCellCache},
+	 * using the provided {@link CacheArrayLoader} to load data.
+	 *
+	 * @param grid
+	 * @param timepoint
+	 * @param setup
+	 * @param level
+	 * @param cacheHints
+	 * @param cacheArrayLoader
+	 * @param type
+	 * @return
+	 */
+	public < T extends NativeType< T >, A > VolatileCachedCellImg< T, A > createImg(
+			final CellGrid grid,
+			final int timepoint,
+			final int setup,
+			final int level,
+			final CacheHints cacheHints,
+			final CacheArrayLoader< A > cacheArrayLoader,
+			final T type )
 	{
-		private final int timepoint;
-
-		private final int setup;
-
-		private final int level;
-
-		private CacheHints cacheHints;
-
-		private final CacheArrayLoader< A > loader;
-
-		public VolatileCellCache( final int timepoint, final int setup, final int level, final CacheHints cacheHints, final CacheArrayLoader< A > loader )
+		final CacheLoader< Long, Cell< ? > > loader = new CacheLoader< Long, Cell< ? > >()
 		{
-			this.timepoint = timepoint;
-			this.setup = setup;
-			this.level = level;
-			this.cacheHints = cacheHints;
-			this.loader = loader;
-		}
+			@Override
+			public Cell< A > get( final Long key ) throws Exception
+			{
+				final int n = grid.numDimensions();
+				final long[] cellMin = new long[ n ];
+				final int[] cellDims = new int[ n ];
+				grid.getCellDimensions( key, cellMin, cellDims );
+				return new Cell<>(
+						cellDims,
+						cellMin,
+						cacheArrayLoader.loadArray( timepoint, setup, level, cellDims, cellMin ) );
+			}
+		};
+
+		final KeyBimap< Long, Key > bimap = KeyBimap.< Long, Key >build(
+				index -> new Key( timepoint, setup, level, index ),
+				key -> key.index );
+
+		final Cache< Long, Cell< ? > > cache = backingCache
+				.mapKeys( bimap )
+				.withLoader( loader );
+
+		final EmptyArrayCreator< A > emptyArrayCreator = cacheArrayLoader.getEmptyArrayCreator();
+		final CreateInvalidVolatileCell< ? > createInvalid = ( emptyArrayCreator == null )
+				? CreateInvalidVolatileCell.get( grid, type, false )
+				: new CreateInvalidVolatileCell<>( grid, type.getEntitiesPerPixel(), emptyArrayCreator );
+
+		final UncheckedVolatileCache< Long, Cell< ? > > vcache = new WeakRefVolatileCache<>(
+				cache, queue, createInvalid )
+						.unchecked();
 
 		@SuppressWarnings( "unchecked" )
-		@Override
-		public VolatileCell< A > get( final int index )
-		{
-			return ( VolatileCell< A > ) getGlobalIfCached( timepoint, setup, level, index, cacheHints );
-		}
+		final VolatileCachedCellImg< T, A > img = new VolatileCachedCellImg<>( grid, type, cacheHints,
+				( i, h ) -> ( Cell< A > ) vcache.get( i, h ) );
 
-		@SuppressWarnings( "unchecked" )
-		@Override
-		public VolatileCell< A > load( final int index, final int[] cellDims, final long[] cellMin )
-		{
-			return ( VolatileCell< A > ) createGlobal( cellDims, cellMin, timepoint, setup, level, index, cacheHints, loader );
-		}
-
-		@Override
-		public void setCacheHints( final CacheHints cacheHints )
-		{
-			this.cacheHints = cacheHints;
-		}
+		return img;
 	}
 }

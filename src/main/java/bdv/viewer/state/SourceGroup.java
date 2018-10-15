@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,8 +41,6 @@ import bdv.viewer.DisplayMode;
  */
 public class SourceGroup
 {
-	final ViewerState owner;
-
 	protected final TreeSet< Integer > sourceIds;
 
 	protected String name;
@@ -57,43 +56,35 @@ public class SourceGroup
 	 */
 	protected boolean isCurrent;
 
-	public SourceGroup( final String name, final ViewerState owner )
+	public SourceGroup( final String name )
 	{
-		this.owner = owner;
-		sourceIds = new TreeSet< Integer >();
+		sourceIds = new TreeSet<>();
 		this.name = name;
 		isActive = true;
 		isCurrent = false;
 	}
 
-	public SourceGroup( final SourceGroup g, final ViewerState owner )
+	protected SourceGroup( final SourceGroup g )
 	{
-		this.owner = owner;
-		sourceIds = new TreeSet< Integer >( g.sourceIds );
+		sourceIds = new TreeSet<>( g.sourceIds );
 		name = g.name;
 		isActive = g.isActive;
 		isCurrent = g.isCurrent;
 	}
 
-	public SourceGroup copy( final ViewerState owner )
+	public SourceGroup copy()
 	{
-		return new SourceGroup( this, owner );
+		return new SourceGroup( this );
 	}
 
 	public void addSource( final int sourceId )
 	{
-		synchronized ( owner )
-		{
-			sourceIds.add( sourceId );
-		}
+		sourceIds.add( sourceId );
 	}
 
 	public void removeSource( final int sourceId )
 	{
-		synchronized ( owner )
-		{
-			sourceIds.remove( sourceId );
-		}
+		sourceIds.remove( sourceId );
 	}
 
 	public SortedSet< Integer > getSourceIds()
@@ -126,10 +117,7 @@ public class SourceGroup
 	 */
 	public void setActive( final boolean isActive )
 	{
-		synchronized ( owner )
-		{
-			this.isActive = isActive;
-		}
+		this.isActive = isActive;
 	}
 
 	/**
@@ -147,10 +135,6 @@ public class SourceGroup
 	 */
 	public void setCurrent( final boolean isCurrent )
 	{
-		synchronized ( owner )
-		{
-			this.isCurrent = isCurrent;
-		}
+		this.isCurrent = isCurrent;
 	}
-
 }

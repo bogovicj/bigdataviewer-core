@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,7 +42,7 @@ import net.imglib2.Volatile;
 import net.imglib2.realtransform.AffineTransform3D;
 import bdv.ViewerImgLoader;
 import bdv.ViewerSetupImgLoader;
-import bdv.img.cache.Cache;
+import bdv.cache.CacheControl;
 
 public class WrapBasicImgLoader implements ViewerImgLoader
 {
@@ -95,7 +96,7 @@ public class WrapBasicImgLoader implements ViewerImgLoader
 
 	private static final AffineTransform3D[] mipmapTransforms = new AffineTransform3D[] { new AffineTransform3D() };
 
-	private static final Cache cache = new Cache.Dummy();
+	private static final CacheControl cache = new CacheControl.Dummy();
 
 	private final HashMap< Integer, WrapSetupImgLoader< ?, ? > > wrapped;
 
@@ -105,7 +106,7 @@ public class WrapBasicImgLoader implements ViewerImgLoader
 	public WrapBasicImgLoader( final BasicImgLoader source, final Map< Integer, ? > setupsMap )
 	{
 		this.source = source;
-		wrapped = new HashMap< Integer, WrapSetupImgLoader< ?, ? > >();
+		wrapped = new HashMap<>();
 		for ( final int setupId : setupsMap.keySet() )
 			wrapped.put( setupId, new WrapSetupImgLoader( source.getSetupImgLoader( setupId ) ) );
 	}
@@ -117,7 +118,7 @@ public class WrapBasicImgLoader implements ViewerImgLoader
 	}
 
 	@Override
-	public Cache getCache()
+	public CacheControl getCacheControl()
 	{
 		return cache;
 	}

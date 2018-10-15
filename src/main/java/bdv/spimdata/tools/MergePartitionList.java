@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -66,7 +67,7 @@ public class MergePartitionList
 			throws IllegalArgumentException
 	{
 		final Hdf5ImageLoader imgLoader = getHdf5ImageLoader( seq );
-		final HashMap< Integer, ExportMipmapInfo > perSetupMipmapInfo = new HashMap< Integer, ExportMipmapInfo >();
+		final HashMap< Integer, ExportMipmapInfo > perSetupMipmapInfo = new HashMap<>();
 		for ( final int setupId : seq.getViewSetups().keySet() )
 		{
 			final MipmapInfo info = imgLoader.getSetupImgLoader( setupId ).getMipmapInfo();;
@@ -92,16 +93,16 @@ public class MergePartitionList
 	{
 		// create partition list for existing dataset
 		final Hdf5ImageLoader imgLoader = getHdf5ImageLoader( seq );
-		final ArrayList< Partition > partitions = new ArrayList< Partition >( imgLoader.getPartitions() );
+		final ArrayList< Partition > partitions = new ArrayList<>( imgLoader.getPartitions() );
 		if ( partitions.isEmpty() )
 		{
 			// maps every existing timepoint id to itself
-			final Map< Integer, Integer > timepointIdentityMap = new HashMap< Integer, Integer >();
+			final Map< Integer, Integer > timepointIdentityMap = new HashMap<>();
 			for ( final TimePoint tp : seq.getTimePoints().getTimePointsOrdered() )
 				timepointIdentityMap.put( tp.getId(), tp.getId() );
 
 			// maps every existing setup id to itself
-			final Map< Integer, Integer > setupIdentityMap = new HashMap< Integer, Integer >();
+			final Map< Integer, Integer > setupIdentityMap = new HashMap<>();
 			for ( final int s : seq.getViewSetups().keySet() )
 				setupIdentityMap.put( s, s );
 

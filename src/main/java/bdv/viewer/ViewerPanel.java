@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -32,6 +33,7 @@ import static bdv.viewer.VisibilityAndGrouping.Event.CURRENT_SOURCE_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.DISPLAY_MODE_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.GROUP_ACTIVITY_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.GROUP_NAME_CHANGED;
+import static bdv.viewer.VisibilityAndGrouping.Event.NUM_GROUPS_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.NUM_SOURCES_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.SOURCE_ACTVITY_CHANGED;
 import static bdv.viewer.VisibilityAndGrouping.Event.VISIBILITY_CHANGED;
@@ -48,10 +50,14 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import javax.swing.DefaultBoundedRangeModel;
 import javax.swing.JPanel;
@@ -62,7 +68,7 @@ import javax.swing.event.ChangeListener;
 
 import org.jdom2.Element;
 
-import bdv.img.cache.Cache;
+import bdv.cache.CacheControl;
 import bdv.util.Affine3DHelpers;
 import bdv.util.InvokeOnEDT;
 import bdv.util.Prefs;
@@ -155,6 +161,13 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	protected final JSlider sliderTime;
 
 	/**
+	 * A {@link ThreadGroup} for (only) the threads used by this
+	 * {@link ViewerPanel}, that is, {@link #painterThread} and
+	 * {@link #renderingExecutorService}.
+	 */
+	protected ThreadGroup threadGroup;
+
+	/**
 	 * Thread that triggers repainting of the display.
 	 */
 	protected final PainterThread painterThread;
@@ -200,6 +213,8 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	 */
 	protected final CopyOnWriteArrayList< TimePointListener > timePointListeners;
 
+	protected final CopyOnWriteArrayList< InterpolationModeListener > interpolationModeListeners;
+
 	/**
 	 * Current animator for viewer transform, or null. This is for example used
 	 * to make smooth transitions when {@link #align(AlignPlane) aligning to
@@ -212,7 +227,7 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	 * animators. Initially, this contains a {@link TextOverlayAnimator} showing
 	 * the "press F1 for help" message.
 	 */
-	protected ArrayList< OverlayAnimator > overlayAnimators;
+	protected final ArrayList< OverlayAnimator > overlayAnimators;
 
 	/**
 	 * Fade-out overlay of recent messages. See {@link #showMessage(String)}.
@@ -221,9 +236,9 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 
 	protected final ViewerOptions.Values options;
 
-	public ViewerPanel( final List< SourceAndConverter< ? > > sources, final int numTimePoints, final Cache cache )
+	public ViewerPanel( final List< SourceAndConverter< ? > > sources, final int numTimePoints, final CacheControl cacheControl )
 	{
-		this( sources, numTimePoints, cache, ViewerOptions.options() );
+		this( sources, numTimePoints, cacheControl, ViewerOptions.options() );
 	}
 
 	/**
@@ -231,20 +246,21 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	 *            the {@link SourceAndConverter sources} to display.
 	 * @param numTimepoints
 	 *            number of available timepoints.
-	 * @param cache
+	 * @param cacheControl
 	 *            to control IO budgeting and fetcher queue.
 	 * @param optional
 	 *            optional parameters. See {@link ViewerOptions#options()}.
 	 */
-	public ViewerPanel( final List< SourceAndConverter< ? > > sources, final int numTimepoints, final Cache cache, final ViewerOptions optional )
+	public ViewerPanel( final List< SourceAndConverter< ? > > sources, final int numTimepoints, final CacheControl cacheControl, final ViewerOptions optional )
 	{
 		super( new BorderLayout(), false );
+
 		options = optional.values;
 
-		final int numGroups = 10;
-		final ArrayList< SourceGroup > groups = new ArrayList< SourceGroup >( numGroups );
+		final int numGroups = options.getNumSourceGroups();
+		final ArrayList< SourceGroup > groups = new ArrayList<>( numGroups );
 		for ( int i = 0; i < numGroups; ++i )
-			groups.add( new SourceGroup( "group " + Integer.toString( i + 1 ), null ) );
+			groups.add( new SourceGroup( "group " + Integer.toString( i + 1 ) ) );
 		state = new ViewerState( sources, groups, numTimepoints );
 		for ( int i = Math.min( numGroups, sources.size() ) - 1; i >= 0; --i )
 			state.getSourceGroups().get( i ).addSource( i );
@@ -255,9 +271,11 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 		sourceInfoOverlayRenderer = new SourceInfoOverlayRenderer();
 		scaleBarOverlayRenderer = Prefs.showScaleBar() ? new ScaleBarOverlayRenderer() : null;
 
-		painterThread = new PainterThread( this );
+		threadGroup = new ThreadGroup( this.toString() );
+		painterThread = new PainterThread( threadGroup, this );
+		painterThread.setDaemon( true );
 		viewerTransform = new AffineTransform3D();
-		display = new InteractiveDisplayCanvasComponent< AffineTransform3D >(
+		display = new InteractiveDisplayCanvasComponent<>(
 				options.getWidth(), options.getHeight(), options.getTransformEventHandlerFactory() );
 		display.addTransformListener( this );
 		renderTarget = new TransformAwareBufferedImageOverlayRenderer();
@@ -265,7 +283,9 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 		display.addOverlayRenderer( renderTarget );
 		display.addOverlayRenderer( this );
 
-		renderingExecutorService = Executors.newFixedThreadPool( options.getNumRenderingThreads() );
+		renderingExecutorService = Executors.newFixedThreadPool(
+				options.getNumRenderingThreads(),
+				new RenderThreadFactory() );
 		imageRenderer = new MultiResolutionRenderer(
 				renderTarget, painterThread,
 				options.getScreenScales(),
@@ -275,7 +295,7 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 				renderingExecutorService,
 				options.isUseVolatileIfAvailable(),
 				options.getAccumulateProjectorFactory(),
-				cache );
+				cacheControl );
 
 		mouseCoordinates = new MouseCoordinateListener();
 		display.addHandler( mouseCoordinates );
@@ -298,13 +318,14 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 		visibilityAndGrouping = new VisibilityAndGrouping( state );
 		visibilityAndGrouping.addUpdateListener( this );
 
-		transformListeners = new CopyOnWriteArrayList< TransformListener< AffineTransform3D > >();
-		lastRenderTransformListeners = new CopyOnWriteArrayList< TransformListener< AffineTransform3D > >();
-		timePointListeners = new CopyOnWriteArrayList< TimePointListener >();
+		transformListeners = new CopyOnWriteArrayList<>();
+		lastRenderTransformListeners = new CopyOnWriteArrayList<>();
+		timePointListeners = new CopyOnWriteArrayList<>();
+		interpolationModeListeners = new CopyOnWriteArrayList<>();
 
 		msgOverlay = options.getMsgOverlay();
 
-		overlayAnimators = new ArrayList< OverlayAnimator >();
+		overlayAnimators = new ArrayList<>();
 		overlayAnimators.add( msgOverlay );
 		overlayAnimators.add( new TextOverlayAnimator( "Press <F1> for help.", 3000, TextPosition.CENTER ) );
 
@@ -331,12 +352,60 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 		requestRepaint();
 	}
 
+	public void addSources( final Collection< SourceAndConverter< ? > > sourceAndConverter )
+	{
+		synchronized ( visibilityAndGrouping )
+		{
+			sourceAndConverter.forEach( state::addSource );
+			visibilityAndGrouping.update( NUM_SOURCES_CHANGED );
+		}
+		requestRepaint();
+	}
+
 	public void removeSource( final Source< ? > source )
 	{
 		synchronized ( visibilityAndGrouping )
 		{
 			state.removeSource( source );
 			visibilityAndGrouping.update( NUM_SOURCES_CHANGED );
+		}
+		requestRepaint();
+	}
+
+	public void removeSources( final Collection< Source< ? > > sources )
+	{
+		synchronized ( visibilityAndGrouping )
+		{
+			sources.forEach( state::removeSource );
+			visibilityAndGrouping.update( NUM_SOURCES_CHANGED );
+		}
+		requestRepaint();
+	}
+
+	public void removeAllSources()
+	{
+		synchronized ( visibilityAndGrouping )
+		{
+			removeSources( getState().getSources().stream().map( SourceAndConverter::getSpimSource ).collect( Collectors.toList() ) );
+		}
+	}
+
+	public void addGroup( final SourceGroup group )
+	{
+		synchronized ( visibilityAndGrouping )
+		{
+			state.addGroup( group );
+			visibilityAndGrouping.update( NUM_GROUPS_CHANGED );
+		}
+		requestRepaint();
+	}
+
+	public void removeGroup( final SourceGroup group )
+	{
+		synchronized ( visibilityAndGrouping )
+		{
+			state.removeGroup( group );
+			visibilityAndGrouping.update( NUM_GROUPS_CHANGED );
 		}
 		requestRepaint();
 	}
@@ -443,12 +512,28 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	@Override
 	public void drawOverlays( final Graphics g )
 	{
-		multiBoxOverlayRenderer.setViewerState( state );
-		multiBoxOverlayRenderer.updateVirtualScreenSize( display.getWidth(), display.getHeight() );
-		multiBoxOverlayRenderer.paint( ( Graphics2D ) g );
+		boolean requiresRepaint = false;
+		if ( Prefs.showMultibox() )
+		{
+			multiBoxOverlayRenderer.setViewerState( state );
+			multiBoxOverlayRenderer.updateVirtualScreenSize( display.getWidth(), display.getHeight() );
+			multiBoxOverlayRenderer.paint( ( Graphics2D ) g );
+			requiresRepaint = multiBoxOverlayRenderer.isHighlightInProgress();
+		}
 
-		sourceInfoOverlayRenderer.setViewerState( state );
-		sourceInfoOverlayRenderer.paint( ( Graphics2D ) g );
+		if( Prefs.showTextOverlay() )
+		{
+			sourceInfoOverlayRenderer.setViewerState( state );
+			sourceInfoOverlayRenderer.paint( ( Graphics2D ) g );
+
+			final RealPoint gPos = new RealPoint( 3 );
+			getGlobalMouseCoordinates( gPos );
+			final String mousePosGlobalString = String.format( "(%6.1f,%6.1f,%6.1f)", gPos.getDoublePosition( 0 ), gPos.getDoublePosition( 1 ), gPos.getDoublePosition( 2 ) );
+
+			g.setFont( new Font( "Monospaced", Font.PLAIN, 12 ) );
+			g.setColor( Color.white );
+			g.drawString( mousePosGlobalString, ( int ) g.getClipBounds().getWidth() - 170, 25 );
+		}
 
 		if ( Prefs.showScaleBar() )
 		{
@@ -456,18 +541,8 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 			scaleBarOverlayRenderer.paint( ( Graphics2D ) g );
 		}
 
-		final RealPoint gPos = new RealPoint( 3 );
-		getGlobalMouseCoordinates( gPos );
-		final String mousePosGlobalString = String.format( "(%6.1f,%6.1f,%6.1f)", gPos.getDoublePosition( 0 ), gPos.getDoublePosition( 1 ), gPos.getDoublePosition( 2 ) );
-
-		g.setFont( new Font( "Monospaced", Font.PLAIN, 12 ) );
-		g.setColor( Color.white );
-		g.drawString( mousePosGlobalString, ( int ) g.getClipBounds().getWidth() - 170, 25 );
-
-		boolean requiresRepaint = multiBoxOverlayRenderer.isHighlightInProgress();
-
 		final long currentTimeMillis = System.currentTimeMillis();
-		final ArrayList< OverlayAnimator > overlayAnimatorsToRemove = new ArrayList< OverlayAnimator >();
+		final ArrayList< OverlayAnimator > overlayAnimatorsToRemove = new ArrayList<>();
 		for ( final OverlayAnimator animator : overlayAnimators )
 		{
 			animator.paint( ( Graphics2D ) g, currentTimeMillis );
@@ -609,22 +684,30 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 
 	/**
 	 * Switch to next interpolation mode. (Currently, there are two
-	 * interpolation modes: nearest-neighbor and N-linear.
+	 * interpolation modes: nearest-neighbor and N-linear.)
 	 */
 	public synchronized void toggleInterpolation()
 	{
+		final int i = state.getInterpolation().ordinal();
+		final int n = Interpolation.values().length;
+		final Interpolation mode = Interpolation.values()[ ( i + 1 ) % n ];
+		setInterpolation( mode );
+	}
+
+	/**
+	 * Set the {@link Interpolation} mode.
+	 */
+	public synchronized void setInterpolation( final Interpolation mode )
+	{
 		final Interpolation interpolation = state.getInterpolation();
-		if ( interpolation == Interpolation.NEARESTNEIGHBOR )
+		if ( mode != interpolation )
 		{
-			state.setInterpolation( Interpolation.NLINEAR );
-			showMessage( "tri-linear interpolation" );
+			state.setInterpolation( mode );
+			showMessage( mode.getName() );
+			for ( final InterpolationModeListener l : interpolationModeListeners )
+				l.interpolationModeChanged( state.getInterpolation() );
+			requestRepaint();
 		}
-		else
-		{
-			state.setInterpolation( Interpolation.NEARESTNEIGHBOR );
-			showMessage( "nearest-neighbor interpolation" );
-		}
-		requestRepaint();
 	}
 
 	/**
@@ -693,14 +776,7 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	{
 		try
 		{
-			InvokeOnEDT.invokeAndWait( new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					setNumTimepointsSynchronized( numTimepoints );
-				}
-			} );
+			InvokeOnEDT.invokeAndWait( () -> setNumTimepointsSynchronized( numTimepoints ) );
 		}
 		catch ( InvocationTargetException | InterruptedException e )
 		{
@@ -735,7 +811,7 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	 *
 	 * @return a copy of the current {@link ViewerState}.
 	 */
-	public synchronized ViewerState getState()
+	public ViewerState getState()
 	{
 		return state.copy();
 	}
@@ -774,6 +850,30 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 	{
 		overlayAnimators.add( animator );
 		display.repaint();
+	}
+
+	/**
+	 * Add a {@link InterpolationModeListener} to notify when the interpolation
+	 * mode is changed. Listeners will be notified <em>before</em> calling
+	 * {@link #requestRepaint()} so they have the chance to interfere.
+	 *
+	 * @param listener
+	 *            the interpolation mode listener to add.
+	 */
+	public void addInterpolationModeListener( final InterpolationModeListener listener )
+	{
+		interpolationModeListeners.add( listener );
+	}
+
+	/**
+	 * Remove a {@link InterpolationModeListener}.
+	 *
+	 * @param listener
+	 *            the interpolation mode listener to remove.
+	 */
+	public void removeInterpolationModeListener( final InterpolationModeListener listener )
+	{
+		interpolationModeListeners.remove( listener );
 	}
 
 	/**
@@ -1007,14 +1107,57 @@ public class ViewerPanel extends JPanel implements OverlayRenderer, TransformLis
 		return options;
 	}
 
+	public SourceInfoOverlayRenderer getSourceInfoOverlayRenderer()
+	{
+		return sourceInfoOverlayRenderer;
+	}
+
 	/**
 	 * Stop the {@link #painterThread} and shutdown rendering {@link ExecutorService}.
 	 */
 	public void stop()
 	{
 		painterThread.interrupt();
+		try
+		{
+			painterThread.join( 0 );
+		}
+		catch ( final InterruptedException e )
+		{
+			e.printStackTrace();
+		}
 		renderingExecutorService.shutdown();
 		state.kill();
 		imageRenderer.kill();
 	}
+
+	protected static final AtomicInteger panelNumber = new AtomicInteger( 1 );
+
+	protected class RenderThreadFactory implements ThreadFactory
+	{
+		private final String threadNameFormat = String.format(
+				"bdv-panel-%d-thread-%%d",
+				panelNumber.getAndIncrement() );
+
+		private final AtomicInteger threadNumber = new AtomicInteger( 1 );
+
+		@Override
+		public Thread newThread( final Runnable r )
+		{
+			final Thread t = new Thread( threadGroup, r,
+					String.format( threadNameFormat, threadNumber.getAndIncrement() ),
+					0 );
+			if ( !t.isDaemon() )
+				t.setDaemon( true );
+			if ( t.getPriority() != Thread.NORM_PRIORITY )
+				t.setPriority( Thread.NORM_PRIORITY );
+			return t;
+		}
+	}
+
+	public TransformAwareBufferedImageOverlayRenderer renderTarget()
+	{
+		return this.renderTarget;
+	}
+
 }

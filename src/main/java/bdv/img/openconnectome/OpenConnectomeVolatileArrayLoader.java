@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -40,8 +41,6 @@ import net.imglib2.img.basictypeaccess.volatiles.array.VolatileByteArray;
 
 public class OpenConnectomeVolatileArrayLoader implements CacheArrayLoader< VolatileByteArray >
 {
-	private VolatileByteArray theEmptyArray;
-
 	final private String tokenUrl;
 
 	final private String mode;
@@ -71,7 +70,6 @@ public class OpenConnectomeVolatileArrayLoader implements CacheArrayLoader< Vola
 			final String mode,
 			final long zMin )
 	{
-		theEmptyArray = new VolatileByteArray( 1, false );
 		this.tokenUrl = baseUrl + "/" + token + "/zip/";
 		this.mode = "/" + mode + ( mode == null || mode.equals( "" ) ? "" : "/" );
 		this.zMin = zMin;
@@ -157,16 +155,5 @@ public class OpenConnectomeVolatileArrayLoader implements CacheArrayLoader< Vola
 		}
 
 		return new VolatileByteArray( data, true );
-	}
-
-	@Override
-	public VolatileByteArray emptyArray( final int[] dimensions )
-	{
-		int numEntities = 1;
-		for ( int i = 0; i < dimensions.length; ++i )
-			numEntities *= dimensions[ i ];
-		if ( theEmptyArray.getCurrentStorageArray().length < numEntities )
-			theEmptyArray = new VolatileByteArray( numEntities, false );
-		return theEmptyArray;
 	}
 }

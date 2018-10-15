@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -59,7 +60,7 @@ public class ProposeMipmaps
 	 */
 	public static Map< Integer, ExportMipmapInfo > proposeMipmaps( final AbstractSequenceDescription< ?, ?, ? > seq )
 	{
-		final HashMap< Integer, ExportMipmapInfo > perSetupExportMipmapInfo = new HashMap< Integer, ExportMipmapInfo >();
+		final HashMap< Integer, ExportMipmapInfo > perSetupExportMipmapInfo = new HashMap<>();
 		for ( final BasicViewSetup setup : seq.getViewSetupsOrdered() )
 			perSetupExportMipmapInfo.put( setup.getId(), proposeMipmaps( setup ) );
 		return perSetupExportMipmapInfo;
@@ -83,8 +84,8 @@ public class ProposeMipmaps
 		final int[] res = new int[] { 1, 1, 1 };
 		final long[] size = new long[ 3 ];
 
-		final ArrayList< int[] > resolutions = new ArrayList< int[] >();
-		final ArrayList< int[] > subdivisions = new ArrayList< int[] >();
+		final ArrayList< int[] > resolutions = new ArrayList<>();
+		final ArrayList< int[] > subdivisions = new ArrayList<>();
 
 //		for ( int level = 0;; ++level )
 		while( true )

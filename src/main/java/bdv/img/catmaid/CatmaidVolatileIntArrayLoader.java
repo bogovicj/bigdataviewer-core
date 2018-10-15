@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,8 +42,6 @@ import net.imglib2.img.basictypeaccess.volatiles.array.VolatileIntArray;
 
 public class CatmaidVolatileIntArrayLoader implements CacheArrayLoader< VolatileIntArray >
 {
-	private VolatileIntArray theEmptyArray;
-
 	private final String urlFormat;
 
 	private final int tileWidth;
@@ -83,7 +82,6 @@ public class CatmaidVolatileIntArrayLoader implements CacheArrayLoader< Volatile
 	 */
 	public CatmaidVolatileIntArrayLoader( final String urlFormat, final int tileWidth, final int tileHeight, final int[] zScales )
 	{
-		theEmptyArray = new VolatileIntArray( tileWidth * tileHeight, false );
 		this.urlFormat = urlFormat;
 		this.tileWidth = tileWidth;
 		this.tileHeight = tileHeight;
@@ -224,16 +222,5 @@ public class CatmaidVolatileIntArrayLoader implements CacheArrayLoader< Volatile
 		}
 
 		return new VolatileIntArray( data, true );
-	}
-
-	@Override
-	public VolatileIntArray emptyArray( final int[] dimensions )
-	{
-		int numEntities = 1;
-		for ( int i = 0; i < dimensions.length; ++i )
-			numEntities *= dimensions[ i ];
-		if ( theEmptyArray.getCurrentStorageArray().length < numEntities )
-			theEmptyArray = new VolatileIntArray( numEntities, false );
-		return theEmptyArray;
 	}
 }

@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,8 +42,9 @@ import javax.swing.ActionMap;
 import javax.swing.InputMap;
 import javax.swing.KeyStroke;
 
+import org.scijava.ui.behaviour.util.InputActionBindings;
+
 import bdv.util.Affine3DHelpers;
-import bdv.viewer.InputActionBindings;
 import bdv.viewer.ViewerPanel;
 import bdv.viewer.animate.RotationAnimator;
 import bdv.viewer.animate.SimilarityTransformAnimator;
@@ -73,15 +75,12 @@ public class BookmarksEditor
 
 	private final InputMap inputMap;
 
-	private final Bookmarks bookmarks;
-
 	private BookmarkTextOverlayAnimator animator;
 
 	public BookmarksEditor( final ViewerPanel viewer, final InputActionBindings inputActionBindings, final Bookmarks bookmarks )
 	{
 		this.viewer = viewer;
 		bindings = inputActionBindings;
-		this.bookmarks = bookmarks;
 		inputMapsToBlock = new ArrayList<>( Arrays.asList( "bdv", "navigation" ) );
 
 		final KeyStroke abortKey = KeyStroke.getKeyStroke( KeyEvent.VK_ESCAPE, 0 );

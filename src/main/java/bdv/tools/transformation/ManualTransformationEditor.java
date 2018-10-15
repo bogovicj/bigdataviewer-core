@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,6 +33,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -39,7 +41,8 @@ import javax.swing.ActionMap;
 import javax.swing.InputMap;
 import javax.swing.KeyStroke;
 
-import bdv.viewer.InputActionBindings;
+import org.scijava.ui.behaviour.util.InputActionBindings;
+
 import bdv.viewer.Source;
 import bdv.viewer.ViewerPanel;
 import bdv.viewer.state.SourceGroup;
@@ -51,7 +54,6 @@ import net.imglib2.ui.TransformListener;
 // TODO: what happens when the current source, display mode, etc is changed while the editor is active? deactivate?
 public class ManualTransformationEditor implements TransformListener< AffineTransform3D >
 {
-
 	private boolean active = false;
 
 	private final InputActionBindings bindings;
@@ -70,14 +72,17 @@ public class ManualTransformationEditor implements TransformListener< AffineTran
 
 	private final InputMap inputMap;
 
+	protected final CopyOnWriteArrayList< ManualTransformActiveListener > manualTransformActiveListeners;
+
 	public ManualTransformationEditor( final ViewerPanel viewer, final InputActionBindings inputActionBindings )
 	{
 		this.viewer = viewer;
 		bindings = inputActionBindings;
 		frozenTransform = new AffineTransform3D();
 		liveTransform = new AffineTransform3D();
-		sourcesToModify = new ArrayList< TransformedSource< ? > >();
-		sourcesToFix = new ArrayList< TransformedSource< ? > >();
+		sourcesToModify = new ArrayList<>();
+		sourcesToFix = new ArrayList<>();
+		manualTransformActiveListeners = new CopyOnWriteArrayList<>();
 
 		final KeyStroke abortKey = KeyStroke.getKeyStroke( KeyEvent.VK_ESCAPE, 0 );
 		final Action abortAction = new AbstractAction( "abort manual transformation" )
@@ -142,12 +147,15 @@ public class ManualTransformationEditor implements TransformListener< AffineTran
 		}
 	}
 
-	public synchronized void toggle()
+	public synchronized void setActive( final boolean a )
 	{
-		if ( !active )
-		{ // Enter manual edit mode
+		if ( this.active == a ) { return; }
+		if ( a )
+		{
+			active = a;
+			// Enter manual edit mode
 			final ViewerState state = viewer.getState();
-			final List< Integer > indices = new ArrayList< Integer >();
+			final List< Integer > indices = new ArrayList<>();
 			switch ( state.getDisplayMode() )
 			{
 			case FUSED:
@@ -171,9 +179,9 @@ public class ManualTransformationEditor implements TransformListener< AffineTran
 				if ( TransformedSource.class.isInstance( source ) )
 				{
 					if ( indices.contains( i ) )
-						sourcesToModify.add( (bdv.tools.transformation.TransformedSource< ? > ) source );
+						sourcesToModify.add( ( bdv.tools.transformation.TransformedSource< ? > ) source );
 					else
-						sourcesToFix.add( (bdv.tools.transformation.TransformedSource< ? > ) source );
+						sourcesToFix.add( ( bdv.tools.transformation.TransformedSource< ? > ) source );
 				}
 			}
 			active = true;
@@ -201,6 +209,15 @@ public class ManualTransformationEditor implements TransformListener< AffineTran
 			viewer.setCurrentViewerTransform( frozenTransform );
 			viewer.showMessage( "fixed manual transform" );
 		}
+		for ( final ManualTransformActiveListener l : manualTransformActiveListeners )
+		{
+			l.manualTransformActiveChanged( active );
+		}
+	}
+
+	public synchronized void toggle()
+	{
+		setActive( !active );
 	}
 
 	@Override
@@ -215,4 +232,13 @@ public class ManualTransformationEditor implements TransformListener< AffineTran
 			source.setIncrementalTransform( liveTransform.inverse() );
 	}
 
+	public void addManualTransformActiveListener( final ManualTransformActiveListener l )
+	{
+		manualTransformActiveListeners.add( l );
+	}
+
+	public void removeManualTransformActiveListener( final ManualTransformActiveListener l )
+	{
+		manualTransformActiveListeners.remove( l );
+	}
 }

@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -52,7 +53,7 @@ public class XmlIoTransformedSources
 
 	public ManualSourceTransforms fromXml( final Element elem )
 	{
-		final ArrayList< AffineTransform3D > transforms = new ArrayList< AffineTransform3D >();
+		final ArrayList< AffineTransform3D > transforms = new ArrayList<>();
 		for ( final Element t : elem.getChildren( SOURCETRANSFORM_TAG ) )
 			transforms.add( fromXmlAffine( t ) );
 		return new ManualSourceTransforms( transforms );

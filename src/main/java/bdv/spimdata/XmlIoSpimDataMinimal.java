@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -53,10 +54,10 @@ public class XmlIoSpimDataMinimal extends XmlIoAbstractSpimData< SequenceDescrip
 	public XmlIoSpimDataMinimal()
 	{
 		super( SpimDataMinimal.class,
-				new XmlIoAbstractSequenceDescription< BasicViewSetup, SequenceDescriptionMinimal >(
+				new XmlIoAbstractSequenceDescription<>(
 						SequenceDescriptionMinimal.class,
 						new XmlIoTimePoints(),
-						new XmlIoBasicViewSetups< BasicViewSetup >( BasicViewSetup.class ),
+						new XmlIoBasicViewSetups<>( BasicViewSetup.class ),
 						new XmlIoMissingViews() ),
 				new XmlIoViewRegistrations() );
 	}

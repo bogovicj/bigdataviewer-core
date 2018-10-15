@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,7 +31,6 @@ package bdv.img.imaris;
 
 import bdv.img.cache.CacheArrayLoader;
 import net.imglib2.Volatile;
-import net.imglib2.img.NativeImg;
 import net.imglib2.img.basictypeaccess.volatiles.VolatileAccess;
 import net.imglib2.img.basictypeaccess.volatiles.array.VolatileByteArray;
 import net.imglib2.img.basictypeaccess.volatiles.array.VolatileFloatArray;
@@ -54,10 +54,6 @@ class DataTypes
 
 		public V getVolatileType();
 
-		public T createLinkedType( NativeImg< T, A > img );
-
-		public V createLinkedVolatileType( NativeImg< V, A > img );
-
 		public CacheArrayLoader< A > createArrayLoader( final IHDF5Access hdf5Access );
 	}
 
@@ -78,18 +74,6 @@ class DataTypes
 		public VolatileUnsignedByteType getVolatileType()
 		{
 			return volatileType;
-		}
-
-		@Override
-		public UnsignedByteType createLinkedType( final NativeImg< UnsignedByteType, VolatileByteArray > img )
-		{
-			return new UnsignedByteType( img );
-		}
-
-		@Override
-		public VolatileUnsignedByteType createLinkedVolatileType( final NativeImg< VolatileUnsignedByteType, VolatileByteArray > img )
-		{
-			return new VolatileUnsignedByteType( img );
 		}
 
 		@Override
@@ -119,18 +103,6 @@ class DataTypes
 		}
 
 		@Override
-		public UnsignedShortType createLinkedType( final NativeImg< UnsignedShortType, VolatileShortArray > img )
-		{
-			return new UnsignedShortType( img );
-		}
-
-		@Override
-		public VolatileUnsignedShortType createLinkedVolatileType( final NativeImg< VolatileUnsignedShortType, VolatileShortArray > img )
-		{
-			return new VolatileUnsignedShortType( img );
-		}
-
-		@Override
 		public CacheArrayLoader< VolatileShortArray > createArrayLoader( final IHDF5Access hdf5Access )
 		{
 			return new ImarisVolatileShortArrayLoader( hdf5Access );
@@ -154,18 +126,6 @@ class DataTypes
 		public VolatileFloatType getVolatileType()
 		{
 			return volatileType;
-		}
-
-		@Override
-		public FloatType createLinkedType( final NativeImg< FloatType, VolatileFloatArray > img )
-		{
-			return new FloatType( img );
-		}
-
-		@Override
-		public VolatileFloatType createLinkedVolatileType( final NativeImg< VolatileFloatType, VolatileFloatArray > img )
-		{
-			return new VolatileFloatType( img );
 		}
 
 		@Override

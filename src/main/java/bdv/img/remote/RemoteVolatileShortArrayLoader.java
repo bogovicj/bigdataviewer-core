@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,18 +34,15 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 
-import net.imglib2.img.basictypeaccess.volatiles.array.VolatileShortArray;
 import bdv.img.cache.CacheArrayLoader;
+import net.imglib2.img.basictypeaccess.volatiles.array.VolatileShortArray;
 
 public class RemoteVolatileShortArrayLoader implements CacheArrayLoader< VolatileShortArray >
 {
-	private VolatileShortArray theEmptyArray;
-
 	private final RemoteImageLoader imgLoader;
 
 	public RemoteVolatileShortArrayLoader( final RemoteImageLoader imgLoader )
 	{
-		theEmptyArray = new VolatileShortArray( 32 * 32 * 32, false );
 		this.imgLoader = imgLoader;
 	}
 
@@ -86,19 +84,7 @@ public class RemoteVolatileShortArrayLoader implements CacheArrayLoader< Volatil
 	}
 
 	@Override
-	public VolatileShortArray emptyArray( final int[] dimensions )
-	{
-		int numEntities = 1;
-		for ( int i = 0; i < dimensions.length; ++i )
-			numEntities *= dimensions[ i ];
-		if ( theEmptyArray.getCurrentStorageArray().length < numEntities )
-			theEmptyArray = new VolatileShortArray( numEntities, false );
-		return theEmptyArray;
-	}
-
-	@Override
 	public int getBytesPerElement() {
 		return 2;
 	}
-
 }

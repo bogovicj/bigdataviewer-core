@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -68,6 +69,7 @@ public interface Source< T >
 	 */
 	public RandomAccessibleInterval< T > getSource( int t, int level );
 
+
 	/**
 	 * Get the 3D stack at timepoint index t, extended to infinity and interpolated.
 	 *
@@ -80,6 +82,14 @@ public interface Source< T >
 	 * @return the extended and interpolated {@link RandomAccessible stack}.
 	 */
 	public RealRandomAccessible< T > getInterpolatedSource( final int t, final int level, final Interpolation method );
+
+	/*
+	 * TODO: Consider adding the methods for getting Source with explicit
+	 * ThreadGroup key (in case we don't want it to be the current thread's
+	 * ThreadGroup).
+	 */
+//	public default RandomAccessibleInterval< T > getSource( int t, int level, ThreadGroup threadGroup );
+//	public RealRandomAccessible< T > getInterpolatedSource( final int t, final int level, final Interpolation method, ThreadGroup threadGroup );
 
 	/**
 	 * Get the transform from the {@link #getSource(int, int) source} at the
@@ -94,9 +104,6 @@ public interface Source< T >
 	 *            source coordinates into the global coordinates
 	 */
 	public void getSourceTransform( int t, int level, AffineTransform3D transform );
-
-	@Deprecated
-	public AffineTransform3D getSourceTransform( int t, int level );
 
 	/**
 	 * Get an instance of the pixel type.

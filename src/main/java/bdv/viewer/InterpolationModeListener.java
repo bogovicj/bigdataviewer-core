@@ -1,8 +1,9 @@
-/*
+/*-
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,34 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-package bdv.img.cache;
+package bdv.viewer;
 
-import net.imglib2.img.basictypeaccess.volatiles.VolatileAccess;
-import net.imglib2.img.cell.AbstractCell;
-
-public class VolatileCell< A extends VolatileAccess > extends AbstractCell< A >
+public interface InterpolationModeListener
 {
-	public VolatileCell( final int[] dimensions, final long[] min, final A data )
-	{
-		super( dimensions, min );
-		this.data = data;
-	}
-
-	private final A data;
-
-	@Override
-	public A getData()
-	{
-		return data;
-	}
-
-	long[] getMin()
-	{
-		return min;
-	}
-
-	int[] getDimensions()
-	{
-		return dimensions;
-	}
+	public void interpolationModeChanged( final Interpolation mode );
 }

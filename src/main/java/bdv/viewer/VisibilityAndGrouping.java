@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,7 +50,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import bdv.viewer.state.SourceGroup;
 import bdv.viewer.state.SourceState;
 import bdv.viewer.state.ViewerState;
-import bdv.viewer.state.XmlIoViewerState;
 
 /**
  * Manage visibility and currentness of sources and groups, as well as grouping
@@ -79,6 +79,8 @@ public class VisibilityAndGrouping
 
 		public static final int NUM_SOURCES_CHANGED = 8;
 
+		public static final int NUM_GROUPS_CHANGED = 9;
+
 		public final int id;
 
 		public final VisibilityAndGrouping visibilityAndGrouping;
@@ -99,13 +101,10 @@ public class VisibilityAndGrouping
 
 	protected final ViewerState state;
 
-	protected final XmlIoViewerState io;
-
 	public VisibilityAndGrouping( final ViewerState viewerState )
 	{
-		updateListeners = new CopyOnWriteArrayList< UpdateListener >();
+		updateListeners = new CopyOnWriteArrayList<>();
 		state = viewerState;
-		io = new XmlIoViewerState();
 	}
 
 	public int numSources()
@@ -194,7 +193,7 @@ public class VisibilityAndGrouping
 	/**
 	 * Set the source active (visible in fused mode) or inactive.
 	 *
-	 * @param sourceIndex
+	 * @param source
 	 * @param isActive
 	 */
 	public synchronized void setSourceActive( final Source< ? > source, final boolean isActive )

@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -53,7 +54,7 @@ class Hdf5BlockWriterThread extends Thread implements IHDF5Access
 	public Hdf5BlockWriterThread( final IHDF5Access hdf5Access, final int queueLength )
 	{
 		this.hdf5Access = hdf5Access;
-		queue = new ArrayBlockingQueue< Hdf5BlockWriterThread.Hdf5Task >( queueLength );
+		queue = new ArrayBlockingQueue<>( queueLength );
 		shutdown = false;
 		setName( "HDF5BlockWriterQueue" );
 	}
@@ -72,7 +73,7 @@ class Hdf5BlockWriterThread extends Thread implements IHDF5Access
 			hdf5Access = new HDF5Access( hdf5Writer );
 		}
 		this.hdf5Access = hdf5Access;
-		queue = new ArrayBlockingQueue< Hdf5BlockWriterThread.Hdf5Task >( queueLength );
+		queue = new ArrayBlockingQueue<>( queueLength );
 		shutdown = false;
 		setName( "HDF5BlockWriterQueue" );
 	}

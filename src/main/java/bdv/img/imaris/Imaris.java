@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,6 +34,16 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
+import bdv.img.hdf5.MipmapInfo;
+import bdv.img.hdf5.Util;
+import bdv.spimdata.SequenceDescriptionMinimal;
+import bdv.spimdata.SpimDataMinimal;
+import bdv.util.MipmapTransforms;
+import ch.systemsx.cisd.hdf5.HDF5DataClass;
+import ch.systemsx.cisd.hdf5.HDF5DataSetInformation;
+import ch.systemsx.cisd.hdf5.HDF5DataTypeInformation;
+import ch.systemsx.cisd.hdf5.HDF5Factory;
+import ch.systemsx.cisd.hdf5.IHDF5Reader;
 import mpicbg.spim.data.generic.sequence.BasicViewSetup;
 import mpicbg.spim.data.registration.ViewRegistration;
 import mpicbg.spim.data.registration.ViewRegistrations;
@@ -43,15 +54,6 @@ import mpicbg.spim.data.sequence.ViewId;
 import mpicbg.spim.data.sequence.VoxelDimensions;
 import net.imglib2.FinalDimensions;
 import net.imglib2.realtransform.AffineTransform3D;
-import bdv.img.hdf5.MipmapInfo;
-import bdv.spimdata.SequenceDescriptionMinimal;
-import bdv.spimdata.SpimDataMinimal;
-import bdv.util.MipmapTransforms;
-import ch.systemsx.cisd.hdf5.HDF5DataClass;
-import ch.systemsx.cisd.hdf5.HDF5DataSetInformation;
-import ch.systemsx.cisd.hdf5.HDF5DataTypeInformation;
-import ch.systemsx.cisd.hdf5.HDF5Factory;
-import ch.systemsx.cisd.hdf5.IHDF5Reader;
 
 public class Imaris
 {
@@ -68,11 +70,11 @@ public class Imaris
 			throw new RuntimeException( e );
 		}
 
-		final HashMap< Integer, double[] > levelToResolution = new HashMap< Integer, double[] >();
-		final HashMap< Integer, int[] > levelToSubdivision = new HashMap< Integer, int[] >();
-		final HashMap< Integer, long[] > levelToDimensions = new HashMap< Integer, long[] >();
-		final HashMap< Integer, TimePoint > timepointMap = new HashMap< Integer, TimePoint >();
-		final HashMap< Integer, BasicViewSetup > setupMap = new HashMap< Integer, BasicViewSetup >();
+		final HashMap< Integer, double[] > levelToResolution = new HashMap<>();
+		final HashMap< Integer, int[] > levelToSubdivision = new HashMap<>();
+		final HashMap< Integer, long[] > levelToDimensions = new HashMap<>();
+		final HashMap< Integer, TimePoint > timepointMap = new HashMap<>();
+		final HashMap< Integer, BasicViewSetup > setupMap = new HashMap<>();
 
 		String path = "DataSetInfo/Image";
 		final double[] extMax = new double[] {
@@ -188,10 +190,13 @@ public class Imaris
 										blockDims[ 2 ] = Integer.parseInt( access.readImarisAttributeString( path, "ImageBlockSizeZ" ) );
 									} catch( final NumberFormatException e )
 									{
-										final int[] chunkSizes = info.tryGetChunkSizes();
+										int[] chunkSizes = info.tryGetChunkSizes();
 										if ( chunkSizes != null )
+										{
+											chunkSizes = Util.reorder( chunkSizes );
 											for ( int d = 0; d < 3; ++d )
 												blockDims[ d ] = chunkSizes[ d ];
+										}
 									}
 
 									resolution = new double[] {
@@ -231,7 +236,7 @@ public class Imaris
 		seq.setImgLoader( imgLoader );
 
 		final File basePath = new File( fn ).getParentFile();
-		final HashMap< ViewId, ViewRegistration > registrations = new HashMap< ViewId, ViewRegistration >();
+		final HashMap< ViewId, ViewRegistration > registrations = new HashMap<>();
 		for ( final BasicViewSetup setup : seq.getViewSetupsOrdered() )
 		{
 			final int setupId = setup.getId();

@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -161,9 +162,9 @@ public class VisibilityAndGroupingDialog extends JDialog
 		{
 			super( new GridBagLayout() );
 			this.visibility = visibilityAndGrouping;
-			currentButtons = new ArrayList< JRadioButton >();
-			fusedBoxes = new ArrayList< JCheckBox >();
-			visibleBoxes = new ArrayList< JCheckBox >();
+			currentButtons = new ArrayList<>();
+			fusedBoxes = new ArrayList<>();
+			visibleBoxes = new ArrayList<>();
 			recreateContent();
 			update();
 		}
@@ -397,10 +398,10 @@ public class VisibilityAndGroupingDialog extends JDialog
 		{
 			super( new GridBagLayout() );
 			this.visibility = visibilityAndGrouping;
-			nameFields = new ArrayList< JTextField >();
-			currentButtons = new ArrayList< JRadioButton >();
-			fusedBoxes = new ArrayList< JCheckBox >();
-			assignBoxes = new ArrayList< JCheckBox >();
+			nameFields = new ArrayList<>();
+			currentButtons = new ArrayList<>();
+			fusedBoxes = new ArrayList<>();
+			assignBoxes = new ArrayList<>();
 			numSources = visibilityAndGrouping.numSources();
 			numGroups = visibilityAndGrouping.numGroups();
 			recreateContent();

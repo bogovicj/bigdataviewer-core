@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -45,9 +46,11 @@ import javax.swing.KeyStroke;
 import javax.swing.WindowConstants;
 
 import bdv.tools.boundingbox.BoundingBoxOverlay.BoundingBoxOverlaySource;
+import bdv.tools.boundingbox.BoxSelectionPanel.Box;
 import bdv.tools.brightness.RealARGBColorConverterSetup;
 import bdv.tools.brightness.SetupAssignments;
 import bdv.tools.transformation.TransformedSource;
+import bdv.util.ModifiableInterval;
 import bdv.util.RealRandomAccessibleSource;
 import bdv.viewer.DisplayMode;
 import bdv.viewer.SourceAndConverter;
@@ -65,6 +68,8 @@ import net.imglib2.type.numeric.integer.UnsignedShortType;
 public class BoundingBoxDialog extends JDialog
 {
 	private static final long serialVersionUID = 1L;
+
+	protected final ModifiableInterval interval;
 
 	protected final BoxRealRandomAccessible< UnsignedShortType > boxRealRandomAccessible;
 
@@ -106,7 +111,8 @@ public class BoundingBoxDialog extends JDialog
 		// create a procedural RealRandomAccessible that will render the bounding box
 		final UnsignedShortType insideValue = new UnsignedShortType( 1000 ); // inside the box pixel value is 1000
 		final UnsignedShortType outsideValue = new UnsignedShortType( 0 ); // outside is 0
-		boxRealRandomAccessible = new BoxRealRandomAccessible< UnsignedShortType >( initialInterval, insideValue, outsideValue );
+		interval = new ModifiableInterval( initialInterval );
+		boxRealRandomAccessible = new BoxRealRandomAccessible<>( interval, insideValue, outsideValue );
 
 		// create a bdv.viewer.Source providing data from the bbox RealRandomAccessible
 		final RealRandomAccessibleSource< UnsignedShortType > boxSource = new RealRandomAccessibleSource< UnsignedShortType >( boxRealRandomAccessible, new UnsignedShortType(), "selection" )
@@ -114,12 +120,12 @@ public class BoundingBoxDialog extends JDialog
 			@Override
 			public Interval getInterval( final int t, final int level )
 			{
-				return boxRealRandomAccessible.getInterval();
+				return interval;
 			}
 		};
 
 		// set up a converter from the source type (UnsignedShortType in this case) to ARGBType
-		final RealARGBColorConverter< UnsignedShortType > converter = new RealARGBColorConverter.Imp1< UnsignedShortType >( 0, 3000 );
+		final RealARGBColorConverter< UnsignedShortType > converter = new RealARGBColorConverter.Imp1<>( 0, 3000 );
 		converter.setColor( new ARGBType( 0x00994499 ) ); // set bounding box color to magenta
 
 		// create a ConverterSetup (can be used by the brightness dialog to adjust the converter settings)
@@ -127,8 +133,8 @@ public class BoundingBoxDialog extends JDialog
 		boxConverterSetup.setViewer( viewer );
 
 		// create a SourceAndConverter (can be added to the viewer for display)
-		final TransformedSource< UnsignedShortType > ts = new TransformedSource< UnsignedShortType >( boxSource );
-		boxSourceAndConverter = new SourceAndConverter< UnsignedShortType >( ts, converter );
+		final TransformedSource< UnsignedShortType > ts = new TransformedSource<>( boxSource );
+		boxSourceAndConverter = new SourceAndConverter<>( ts, converter );
 
 		// create an Overlay to show 3D wireframe box
 		boxOverlay = new BoundingBoxOverlay( new BoundingBoxOverlaySource()
@@ -142,20 +148,28 @@ public class BoundingBoxDialog extends JDialog
 			@Override
 			public Interval getInterval()
 			{
-				return boxRealRandomAccessible.getInterval();
+				return interval;
 			}
 		});
 
 		// create a JPanel with sliders to modify the bounding box interval (boxRealRandomAccessible.getInterval())
-		boxSelectionPanel = new BoxSelectionPanel( boxRealRandomAccessible.getInterval(), rangeInterval );
-		boxSelectionPanel.addSelectionUpdateListener( new BoxSelectionPanel.SelectionUpdateListener() // listen for updates on the bbox to trigger repainting
-		{
-			@Override
-			public void selectionUpdated()
-			{
-				viewer.requestRepaint();
-			}
-		} );
+		boxSelectionPanel = new BoxSelectionPanel(
+				new Box()
+				{
+					@Override
+					public void setInterval( final Interval i )
+					{
+						interval.set( i );
+						viewer.requestRepaint();
+					}
+
+					@Override
+					public Interval getInterval()
+					{
+						return interval;
+					}
+				},
+				rangeInterval );
 
 		// when dialog is made visible, add bbox source
 		// when dialog is hidden, remove bbox source

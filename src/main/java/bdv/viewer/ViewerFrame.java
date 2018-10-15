@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -39,9 +40,11 @@ import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
 import org.scijava.ui.behaviour.MouseAndKeyHandler;
+import org.scijava.ui.behaviour.util.InputActionBindings;
+import org.scijava.ui.behaviour.util.TriggerBehaviourBindings;
 
 import bdv.BehaviourTransformEventHandler;
-import bdv.img.cache.Cache;
+import bdv.cache.CacheControl;
 import net.imglib2.ui.TransformEventHandler;
 import net.imglib2.ui.util.GuiUtil;
 
@@ -64,7 +67,7 @@ public class ViewerFrame extends JFrame
 	public ViewerFrame(
 			final List< SourceAndConverter< ? > > sources,
 			final int numTimepoints,
-			final Cache cache )
+			final CacheControl cache )
 	{
 		this( sources, numTimepoints, cache, ViewerOptions.options() );
 	}
@@ -75,7 +78,7 @@ public class ViewerFrame extends JFrame
 	 *            the {@link SourceAndConverter sources} to display.
 	 * @param numTimepoints
 	 *            number of available timepoints.
-	 * @param cache
+	 * @param cacheControl
 	 *            handle to cache. This is used to control io timing.
 	 * @param optional
 	 *            optional parameters. See {@link ViewerOptions#options()}.
@@ -83,12 +86,12 @@ public class ViewerFrame extends JFrame
 	public ViewerFrame(
 			final List< SourceAndConverter< ? > > sources,
 			final int numTimepoints,
-			final Cache cache,
+			final CacheControl cacheControl,
 			final ViewerOptions optional )
 	{
 //		super( "BigDataViewer", GuiUtil.getSuitableGraphicsConfiguration( GuiUtil.ARGB_COLOR_MODEL ) );
 		super( "BigDataViewer", GuiUtil.getSuitableGraphicsConfiguration( GuiUtil.RGB_COLOR_MODEL ) );
-		viewer = new ViewerPanel( sources, numTimepoints, cache, optional );
+		viewer = new ViewerPanel( sources, numTimepoints, cacheControl, optional );
 		keybindings = new InputActionBindings();
 		triggerbindings = new TriggerBehaviourBindings();
 
@@ -111,6 +114,7 @@ public class ViewerFrame extends JFrame
 		final MouseAndKeyHandler mouseAndKeyHandler = new MouseAndKeyHandler();
 		mouseAndKeyHandler.setInputMap( triggerbindings.getConcatenatedInputTriggerMap() );
 		mouseAndKeyHandler.setBehaviourMap( triggerbindings.getConcatenatedBehaviourMap() );
+		mouseAndKeyHandler.setKeypressManager( optional.values.getKeyPressedManager(), viewer.getDisplay() );
 		viewer.getDisplay().addHandler( mouseAndKeyHandler );
 
 		final TransformEventHandler< ? > tfHandler = viewer.getDisplay().getTransformEventHandler();

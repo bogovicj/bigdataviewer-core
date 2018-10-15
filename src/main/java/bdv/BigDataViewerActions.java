@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -34,6 +35,8 @@ import javax.swing.ActionMap;
 import javax.swing.InputMap;
 
 import org.scijava.ui.behaviour.KeyStrokeAdder;
+import org.scijava.ui.behaviour.util.Actions;
+import org.scijava.ui.behaviour.util.InputActionBindings;
 
 import bdv.tools.HelpDialog;
 import bdv.tools.RecordMaxProjectionDialog;
@@ -44,10 +47,8 @@ import bdv.tools.bookmarks.BookmarksEditor;
 import bdv.tools.brightness.BrightnessDialog;
 import bdv.tools.crop.CropDialog;
 import bdv.tools.transformation.ManualTransformationEditor;
-import bdv.util.AbstractActions;
-import bdv.viewer.InputActionBindings;
 
-public class BigDataViewerActions extends AbstractActions
+public class BigDataViewerActions extends Actions
 {
 	public static final String BRIGHTNESS_SETTINGS = "brightness settings";
 	public static final String VISIBILITY_AND_GROUPING = "visibility and grouping";
@@ -91,7 +92,8 @@ public class BigDataViewerActions extends AbstractActions
 			final BigDataViewer bdv,
 			final KeyStrokeAdder.Factory keyProperties )
 	{
-		final BigDataViewerActions actions = new BigDataViewerActions( inputActionBindings, keyProperties );
+		final BigDataViewerActions actions = new BigDataViewerActions( keyProperties );
+
 		actions.dialog( bdv.brightnessDialog );
 		actions.dialog( bdv.activeSourcesDialog );
 		actions.dialog( bdv.helpDialog );
@@ -102,27 +104,19 @@ public class BigDataViewerActions extends AbstractActions
 		actions.manualTransform( bdv.manualTransformationEditor );
 		actions.runnableAction( bdv::loadSettings, LOAD_SETTINGS, LOAD_SETTINGS_KEYS );
 		actions.runnableAction( bdv::saveSettings, SAVE_SETTINGS, SAVE_SETTINGS_KEYS );
+
+		actions.install( inputActionBindings, "bdv" );
 	}
 
-	public BigDataViewerActions(
-			final InputActionBindings inputActionBindings,
-			final KeyStrokeAdder.Factory keyConfig )
+	public BigDataViewerActions( final KeyStrokeAdder.Factory keyConfig )
 	{
-		this( inputActionBindings, keyConfig, "bdv" );
-	}
-
-	public BigDataViewerActions(
-			final InputActionBindings inputActionBindings,
-			final KeyStrokeAdder.Factory keyConfig,
-			final String name )
-	{
-		super( inputActionBindings, name, keyConfig, new String[] { "bdv" } );
+		super( keyConfig, new String[] { "bdv" } );
 	}
 
 	public void toggleDialogAction( final Dialog dialog, final String name, final String... defaultKeyStrokes )
 	{
 		keyStrokeAdder.put( name, defaultKeyStrokes );
-		new ToggleDialogAction( name, dialog ).put( actionMap );
+		new ToggleDialogAction( name, dialog ).put( getActionMap() );
 	}
 
 	public void dialog( final BrightnessDialog brightnessDialog )

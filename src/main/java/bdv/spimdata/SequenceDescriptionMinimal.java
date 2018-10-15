@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,7 +48,7 @@ public class SequenceDescriptionMinimal extends AbstractSequenceDescription< Bas
 	@Override
 	protected BasicViewDescription< BasicViewSetup > createViewDescription( final int timepointId, final int setupId )
 	{
-		return new BasicViewDescription< BasicViewSetup >( timepointId, setupId, true, this );
+		return new BasicViewDescription<>( timepointId, setupId, true, this );
 	}
 
 	/**

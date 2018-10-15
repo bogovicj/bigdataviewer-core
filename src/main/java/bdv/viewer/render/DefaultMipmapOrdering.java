@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,11 +31,11 @@ package bdv.viewer.render;
 
 import java.util.ArrayList;
 
-import net.imglib2.realtransform.AffineTransform3D;
-import bdv.img.cache.CacheHints;
-import bdv.img.cache.LoadingStrategy;
 import bdv.util.MipmapTransforms;
 import bdv.viewer.Source;
+import net.imglib2.cache.volatiles.CacheHints;
+import net.imglib2.cache.volatiles.LoadingStrategy;
+import net.imglib2.realtransform.AffineTransform3D;
 
 /**
  * The standard mipmap ordering strategy for local hdf5 data. Assumes that
@@ -83,7 +84,7 @@ public class DefaultMipmapOrdering implements MipmapOrdering
 			final boolean prefetchEnqueuToFront )
 	{
 		this.source = source;
-		precomputedLevels = new ArrayList< Level >();
+		precomputedLevels = new ArrayList<>();
 		final int numMipmapLevels = source.getNumMipmapLevels();
 		final int maxLevel = numMipmapLevels - 1;
 		for ( int level = 0; level < numMipmapLevels; ++level )
@@ -107,7 +108,7 @@ public class DefaultMipmapOrdering implements MipmapOrdering
 		final int numMipmapLevels = source.getNumMipmapLevels();
 		final int maxLevel = numMipmapLevels - 1;
 		boolean renewHintsAfterPaintingOnce = false;
-		final ArrayList< Level > levels = new ArrayList< Level >();
+		final ArrayList< Level > levels = new ArrayList<>();
 		if ( timepoint != previousTimepoint )
 		{
 			// When scrolling through time, we often get frames for which no

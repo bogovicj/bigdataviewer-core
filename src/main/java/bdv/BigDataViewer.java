@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,12 +50,11 @@ import org.jdom2.input.SAXBuilder;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
 import org.scijava.ui.behaviour.io.InputTriggerConfig;
-import org.scijava.ui.behaviour.io.InputTriggerDescription;
 import org.scijava.ui.behaviour.io.yaml.YamlConfigIO;
 
+import bdv.cache.CacheControl;
 import bdv.export.ProgressWriter;
 import bdv.export.ProgressWriterConsole;
-import bdv.img.cache.Cache;
 import bdv.spimdata.SpimDataMinimal;
 import bdv.spimdata.WrapBasicImgLoader;
 import bdv.spimdata.XmlIoSpimDataMinimal;
@@ -74,7 +74,6 @@ import bdv.tools.crop.CropDialog;
 import bdv.tools.transformation.ManualTransformation;
 import bdv.tools.transformation.ManualTransformationEditor;
 import bdv.tools.transformation.TransformedSource;
-import bdv.util.KeyProperties;
 import bdv.viewer.NavigationActions;
 import bdv.viewer.SourceAndConverter;
 import bdv.viewer.ViewerFrame;
@@ -177,23 +176,23 @@ public class BigDataViewer
 		}
 		final double typeMin = Math.max( 0, Math.min( type.getMinValue(), 65535 ) );
 		final double typeMax = Math.max( 0, Math.min( type.getMaxValue(), 65535 ) );
-		final RealARGBColorConverter< V > vconverter = new RealARGBColorConverter.Imp0< V >( typeMin, typeMax );
+		final RealARGBColorConverter< V > vconverter = new RealARGBColorConverter.Imp0<>( typeMin, typeMax );
 		vconverter.setColor( new ARGBType( 0xffffffff ) );
-		final RealARGBColorConverter< T > converter = new RealARGBColorConverter.Imp1< T >( typeMin, typeMax );
+		final RealARGBColorConverter< T > converter = new RealARGBColorConverter.Imp1<>( typeMin, typeMax );
 		converter.setColor( new ARGBType( 0xffffffff ) );
 
 		final int setupId = setup.getId();
 		final String setupName = createSetupName( setup );
-		final VolatileSpimSource< T, V > vs = new VolatileSpimSource< T, V >( spimData, setupId, setupName );
+		final VolatileSpimSource< T, V > vs = new VolatileSpimSource<>( spimData, setupId, setupName );
 		final SpimSource< T > s = vs.nonVolatile();
 
 		// Decorate each source with an extra transformation, that can be
 		// edited manually in this viewer.
-		final TransformedSource< V > tvs = new TransformedSource< V >( vs );
-		final TransformedSource< T > ts = new TransformedSource< T >( s, tvs );
+		final TransformedSource< V > tvs = new TransformedSource<>( vs );
+		final TransformedSource< T > ts = new TransformedSource<>( s, tvs );
 
-		final SourceAndConverter< V > vsoc = new SourceAndConverter< V >( tvs, vconverter );
-		final SourceAndConverter< T > soc = new SourceAndConverter< T >( ts, converter, vsoc );
+		final SourceAndConverter< V > vsoc = new SourceAndConverter<>( tvs, vconverter );
+		final SourceAndConverter< T > soc = new SourceAndConverter<>( ts, converter, vsoc );
 
 		sources.add( soc );
 		converterSetups.add( new RealARGBColorConverterSetup( setupId, converter, vconverter ) );
@@ -208,17 +207,17 @@ public class BigDataViewer
 	{
 		final double typeMin = type.getMinValue();
 		final double typeMax = type.getMaxValue();
-		final RealARGBColorConverter< T > converter = new RealARGBColorConverter.Imp1< T >( typeMin, typeMax );
+		final RealARGBColorConverter< T > converter = new RealARGBColorConverter.Imp1<>( typeMin, typeMax );
 		converter.setColor( new ARGBType( 0xffffffff ) );
 
 		final int setupId = setup.getId();
 		final String setupName = createSetupName( setup );
-		final SpimSource< T > s = new SpimSource< T >( spimData, setupId, setupName );
+		final SpimSource< T > s = new SpimSource<>( spimData, setupId, setupName );
 
 		// Decorate each source with an extra transformation, that can be
 		// edited manually in this viewer.
-		final TransformedSource< T > ts = new TransformedSource< T >( s );
-		final SourceAndConverter< T > soc = new SourceAndConverter< T >( ts, converter );
+		final TransformedSource< T > ts = new TransformedSource<>( s );
+		final SourceAndConverter< T > soc = new SourceAndConverter<>( ts, converter );
 
 		sources.add( soc );
 		converterSetups.add( new RealARGBColorConverterSetup( setupId, converter ) );
@@ -241,16 +240,16 @@ public class BigDataViewer
 
 		final int setupId = setup.getId();
 		final String setupName = createSetupName( setup );
-		final VolatileSpimSource< ARGBType, VolatileARGBType > vs = new VolatileSpimSource< ARGBType, VolatileARGBType >( spimData, setupId, setupName );
+		final VolatileSpimSource< ARGBType, VolatileARGBType > vs = new VolatileSpimSource<>( spimData, setupId, setupName );
 		final SpimSource< ARGBType > s = vs.nonVolatile();
 
 		// Decorate each source with an extra transformation, that can be
 		// edited manually in this viewer.
-		final TransformedSource< VolatileARGBType > tvs = new TransformedSource< VolatileARGBType >( vs );
-		final TransformedSource< ARGBType > ts = new TransformedSource< ARGBType >( s, tvs );
+		final TransformedSource< VolatileARGBType > tvs = new TransformedSource<>( vs );
+		final TransformedSource< ARGBType > ts = new TransformedSource<>( s, tvs );
 
-		final SourceAndConverter< VolatileARGBType > vsoc = new SourceAndConverter< VolatileARGBType >( tvs, vconverter );
-		final SourceAndConverter< ARGBType > soc = new SourceAndConverter< ARGBType >( ts, converter, vsoc );
+		final SourceAndConverter< VolatileARGBType > vsoc = new SourceAndConverter<>( tvs, vconverter );
+		final SourceAndConverter< ARGBType > soc = new SourceAndConverter<>( ts, converter, vsoc );
 
 		sources.add( soc );
 		converterSetups.add( new RealARGBColorConverterSetup( setupId, converter, vconverter ) );
@@ -267,12 +266,12 @@ public class BigDataViewer
 
 		final int setupId = setup.getId();
 		final String setupName = createSetupName( setup );
-		final SpimSource< ARGBType > s = new SpimSource< ARGBType >( spimData, setupId, setupName );
+		final SpimSource< ARGBType > s = new SpimSource<>( spimData, setupId, setupName );
 
 		// Decorate each source with an extra transformation, that can be
 		// edited manually in this viewer.
-		final TransformedSource< ARGBType > ts = new TransformedSource< ARGBType >( s );
-		final SourceAndConverter< ARGBType > soc = new SourceAndConverter< ARGBType >( ts, converter );
+		final TransformedSource< ARGBType > ts = new TransformedSource<>( s );
+		final SourceAndConverter< ARGBType > soc = new SourceAndConverter<>( ts, converter );
 
 		sources.add( soc );
 		converterSetups.add( new RealARGBColorConverterSetup( setupId, converter ) );
@@ -328,7 +327,7 @@ public class BigDataViewer
 			final ArrayList< SourceAndConverter< ? > > sources,
 			final AbstractSpimData< ? > spimData,
 			final int numTimepoints,
-			final Cache cache,
+			final CacheControl cache,
 			final String windowTitle,
 			final ProgressWriter progressWriter,
 			final ViewerOptions options )
@@ -343,8 +342,7 @@ public class BigDataViewer
 		viewer = viewerFrame.getViewerPanel();
 
 		for ( final ConverterSetup cs : converterSetups )
-			if ( RealARGBColorConverterSetup.class.isInstance( cs ) )
-				( ( RealARGBColorConverterSetup ) cs ).setViewer( viewer );
+			cs.setViewer( viewer );
 
 		manualTransformation = new ManualTransformation( viewer );
 		manualTransformationEditor = new ManualTransformationEditor( viewer, viewerFrame.getKeybindings() );
@@ -361,6 +359,9 @@ public class BigDataViewer
 		}
 
 		brightnessDialog = new BrightnessDialog( viewerFrame, setupAssignments );
+
+		if (spimData != null )
+			viewer.getSourceInfoOverlayRenderer().setTimePointsOrdered( spimData.getSequenceDescription().getTimePoints().getTimePointsOrdered() );
 
 		cropDialog = ( spimData == null ) ? null : new CropDialog( viewerFrame, viewer, spimData.getSequenceDescription() );
 
@@ -470,13 +471,13 @@ public class BigDataViewer
 			System.err.println( "WARNING:\nOpening <SpimData> dataset that is not suited for interactive browsing.\nConsider resaving as HDF5 for better performance." );
 		}
 
-		final ArrayList< ConverterSetup > converterSetups = new ArrayList< ConverterSetup >();
-		final ArrayList< SourceAndConverter< ? > > sources = new ArrayList< SourceAndConverter< ? > >();
+		final ArrayList< ConverterSetup > converterSetups = new ArrayList<>();
+		final ArrayList< SourceAndConverter< ? > > sources = new ArrayList<>();
 		initSetups( spimData, converterSetups, sources );
 
 		final AbstractSequenceDescription< ?, ?, ? > seq = spimData.getSequenceDescription();
 		final int numTimepoints = seq.getTimePoints().size();
-		final Cache cache = ( ( ViewerImgLoader ) seq.getImgLoader() ).getCache();
+		final CacheControl cache = ( ( ViewerImgLoader ) seq.getImgLoader() ).getCacheControl();
 
 		final BigDataViewer bdv = new BigDataViewer( converterSetups, sources, spimData, numTimepoints, cache, windowTitle, progressWriter, options );
 
@@ -500,7 +501,7 @@ public class BigDataViewer
 			final ArrayList< ConverterSetup > converterSetups,
 			final ArrayList< SourceAndConverter< ? > > sources,
 			final int numTimepoints,
-			final Cache cache,
+			final CacheControl cache,
 			final String windowTitle,
 			final ProgressWriter progressWriter,
 			final ViewerOptions options )
@@ -524,6 +525,11 @@ public class BigDataViewer
 	public SetupAssignments getSetupAssignments()
 	{
 		return setupAssignments;
+	}
+
+	public ManualTransformationEditor getManualTransformEditor()
+	{
+		return manualTransformationEditor;
 	}
 
 	public boolean tryLoadSettings( final String xmlFilename )
@@ -567,7 +573,7 @@ public class BigDataViewer
 		return false;
 	}
 
-	protected void saveSettings()
+	public void saveSettings()
 	{
 		fileChooser.setSelectedFile( proposedSettingsFile );
 		final int returnVal = fileChooser.showSaveDialog( null );
@@ -585,7 +591,7 @@ public class BigDataViewer
 		}
 	}
 
-	protected void saveSettings( final String xmlFilename ) throws IOException
+	public void saveSettings( final String xmlFilename ) throws IOException
 	{
 		final Element root = new Element( "Settings" );
 		root.addContent( viewer.stateToXml() );
@@ -640,19 +646,6 @@ public class BigDataViewer
 			}
 		}
 
-		// try to load and convert old KeyProperties file "bigdataviewer.keys.properties" in current directory
-		if ( conf == null && new File( "bigdataviewer.keys.properties" ).exists() )
-		{
-			final ArrayList< InputTriggerDescription > descriptions = KeyProperties.readPropertyFile().getInputTriggerDescriptions();
-			conf = new InputTriggerConfig( descriptions );
-			try
-			{
-				YamlConfigIO.write( descriptions, "bdvkeyconfig.yaml" );
-			}
-			catch ( final IOException e )
-			{}
-		}
-
 		if ( conf == null )
 		{
 			conf = new InputTriggerConfig();
@@ -661,7 +654,7 @@ public class BigDataViewer
 		return conf;
 	}
 
-	protected void loadSettings()
+	public void loadSettings()
 	{
 		fileChooser.setSelectedFile( proposedSettingsFile );
 		final int returnVal = fileChooser.showOpenDialog( null );
@@ -679,7 +672,7 @@ public class BigDataViewer
 		}
 	}
 
-	protected void loadSettings( final String xmlFilename ) throws IOException, JDOMException
+	public void loadSettings( final String xmlFilename ) throws IOException, JDOMException
 	{
 		final SAXBuilder sax = new SAXBuilder();
 		final Document doc = sax.build( xmlFilename );
@@ -690,79 +683,6 @@ public class BigDataViewer
 		bookmarks.restoreFromXml( root );
 		activeSourcesDialog.update();
 		viewer.requestRepaint();
-	}
-
-	/**
-	 * Deprecated, please use {@link #open(String, String, ProgressWriter, ViewerOptions)} instead.
-	 */
-	@Deprecated
-	public BigDataViewer( final String xmlFilename, final String windowTitle, final ProgressWriter progressWriter ) throws SpimDataException
-	{
-		this( new XmlIoSpimDataMinimal().load( xmlFilename ), windowTitle, progressWriter );
-		if ( !tryLoadSettings( xmlFilename ) )
-			InitializeViewerState.initBrightness( 0.001, 0.999, viewer, setupAssignments );
-	}
-
-	/**
-	 * Deprecated, please use {@link #open(AbstractSpimData, String, ProgressWriter, ViewerOptions)} instead.
-	 */
-	@Deprecated
-	public BigDataViewer( final AbstractSpimData< ? > spimData, final String windowTitle, final ProgressWriter progressWriter )
-	{
-		this( new ForDeprecatedConstructors( spimData, windowTitle, progressWriter ) );
-		viewerFrame.setVisible( true );
-		InitializeViewerState.initTransform( viewer );
-	}
-
-	@Deprecated
-	private static class ForDeprecatedConstructors
-	{
-		final ArrayList< ConverterSetup > converterSetups;
-		final ArrayList< SourceAndConverter< ? > > sources;
-		final AbstractSpimData< ? > spimData;
-		final int numTimepoints;
-		final Cache cache;
-		final String windowTitle;
-		final ProgressWriter progressWriter;
-		final ViewerOptions options;
-
-		private ForDeprecatedConstructors( final AbstractSpimData< ? > spimData, final String windowTitle, final ProgressWriter progressWriter )
-		{
-			this.windowTitle = windowTitle;
-			this.progressWriter = progressWriter;
-			this.spimData = spimData;
-			this.options = ViewerOptions.options();
-
-			if ( WrapBasicImgLoader.wrapImgLoaderIfNecessary( spimData ) )
-			{
-				System.err.println( "WARNING:\nOpening <SpimData> dataset that is not suited for interactive browsing.\nConsider resaving as HDF5 for better performance." );
-			}
-
-			converterSetups = new ArrayList< ConverterSetup >();
-			sources = new ArrayList< SourceAndConverter< ? > >();
-			initSetups( spimData, converterSetups, sources );
-
-			final AbstractSequenceDescription< ?, ?, ? > seq = spimData.getSequenceDescription();
-			numTimepoints = seq.getTimePoints().size();
-			cache = ( ( ViewerImgLoader ) seq.getImgLoader() ).getCache();
-
-			WrapBasicImgLoader.removeWrapperIfPresent( spimData );
-		}
-	}
-
-	@Deprecated
-	private BigDataViewer( final ForDeprecatedConstructors p )
-	{
-		this( p.converterSetups, p.sources, p.spimData, p.numTimepoints, p.cache, p.windowTitle, p.progressWriter, p.options );
-	}
-
-	/**
-	 * Deprecated, please use {@link #open(String, String, ProgressWriter, ViewerOptions)} instead.
-	 */
-	@Deprecated
-	public static void view( final String filename, final ProgressWriter progressWriter ) throws SpimDataException
-	{
-		open( filename, new File( filename ).getName(), progressWriter, ViewerOptions.options() );
 	}
 
 	public static void main( final String[] args )

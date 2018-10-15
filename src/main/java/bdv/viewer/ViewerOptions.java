@@ -2,17 +2,18 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,6 +29,9 @@
  */
 package bdv.viewer;
 
+import java.awt.event.KeyListener;
+
+import org.scijava.ui.behaviour.KeyPressedManager;
 import org.scijava.ui.behaviour.io.InputTriggerConfig;
 
 import bdv.BehaviourTransformEventHandler3D;
@@ -134,6 +138,18 @@ public class ViewerOptions
 	}
 
 	/**
+	 * Set how many source groups there are initially.
+	 *
+	 * @param n
+	 *            How many source groups to create initially.
+	 */
+	public ViewerOptions numSourceGroups( final int n )
+	{
+		values.numSourceGroups = n;
+		return this;
+	}
+
+	/**
 	 * Set whether volatile versions of sources should be used if available.
 	 *
 	 * @param v
@@ -185,6 +201,25 @@ public class ViewerOptions
 	}
 
 	/**
+	 * Set the {@link KeyPressedManager} to share
+	 * {@link KeyListener#keyPressed(java.awt.event.KeyEvent)} events with other
+	 * ui-behaviour windows.
+	 * <p>
+	 * The goal is to make keyboard click/drag behaviours work like mouse
+	 * click/drag: When a behaviour is initiated with a key press, the window
+	 * under the mouse receives focus and the behaviour is handled there.
+	 * </p>
+	 *
+	 * @param manager
+	 * @return
+	 */
+	public ViewerOptions shareKeyPressedEvents( final KeyPressedManager manager )
+	{
+		values.keyPressedManager = manager;
+		return this;
+	}
+
+	/**
 	 * Read-only {@link ViewerOptions} values.
 	 */
 	public static class Values
@@ -201,6 +236,8 @@ public class ViewerOptions
 
 		private int numRenderingThreads = 3;
 
+		private int numSourceGroups = 10;
+
 		private boolean useVolatileIfAvailable = true;
 
 		private MessageOverlayAnimator msgOverlay = new MessageOverlayAnimator( 800 );
@@ -211,6 +248,8 @@ public class ViewerOptions
 
 		private InputTriggerConfig inputTriggerConfig = null;
 
+		private KeyPressedManager keyPressedManager = null;
+
 		public ViewerOptions optionsFromValues()
 		{
 			return new ViewerOptions().
@@ -220,6 +259,7 @@ public class ViewerOptions
 				targetRenderNanos( targetRenderNanos ).
 				doubleBuffered( doubleBuffered ).
 				numRenderingThreads( numRenderingThreads ).
+				numSourceGroups( numSourceGroups ).
 				useVolatileIfAvailable( useVolatileIfAvailable ).
 				msgOverlay( msgOverlay ).
 				transformEventHandlerFactory( transformEventHandlerFactory ).
@@ -257,6 +297,11 @@ public class ViewerOptions
 			return numRenderingThreads;
 		}
 
+		public int getNumSourceGroups()
+		{
+			return numSourceGroups;
+		}
+
 		public boolean isUseVolatileIfAvailable()
 		{
 			return useVolatileIfAvailable;
@@ -280,6 +325,11 @@ public class ViewerOptions
 		public InputTriggerConfig getInputTriggerConfig()
 		{
 			return inputTriggerConfig;
+		}
+
+		public KeyPressedManager getKeyPressedManager()
+		{
+			return keyPressedManager;
 		}
 	}
 }

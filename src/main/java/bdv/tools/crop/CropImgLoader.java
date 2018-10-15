@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -78,7 +79,7 @@ public class CropImgLoader implements BasicImgLoader
 		this.globalToCropTransform = globalToCropTransform;
 		this.cropInterval = cropInterval;
 		this.timepointIdToTimepointIndex = timepointIdToTimepointIndex;
-		this.setupImgLoaders = new HashMap< Integer, SetupImgLoader< ? > >();
+		this.setupImgLoaders = new HashMap<>();
 		for ( final Entry< Integer, Integer > entry : setupIdToSourceIndex.entrySet() )
 			setupImgLoaders.put( entry.getKey(), createSetupImgLoader( sources.get( entry.getValue() ) ) );
 	}
@@ -124,7 +125,7 @@ public class CropImgLoader implements BasicImgLoader
 		final AffineTransform3D cropToSource = globalToSource.copy();
 		cropToSource.concatenate( cropToGlobal );
 
-		final ArrayList< RealPoint > sourceCorners = new ArrayList< RealPoint >();
+		final ArrayList< RealPoint > sourceCorners = new ArrayList<>();
 		for ( final RealLocalizable corner : IntervalBoundingBox.getCorners( interval ) )
 		{
 			final RealPoint sourceCorner = new RealPoint( n );
@@ -154,12 +155,12 @@ public class CropImgLoader implements BasicImgLoader
 			0, 0, 1, sourceInterval.min( 2 ) );
 		croppedSourceTransform.preConcatenate( sourceToGlobal );
 
-		return new ValuePair< RandomAccessibleInterval<T>, AffineTransform3D >( croppedSourceImg, croppedSourceTransform );
+		return new ValuePair<>( croppedSourceImg, croppedSourceTransform );
 	}
 
 	private < T > SetupImgLoader< T > createSetupImgLoader( final Source< T > source )
 	{
-		return new SetupImgLoader< T >( source );
+		return new SetupImgLoader<>( source );
 	}
 
 	public class SetupImgLoader< T > implements BasicSetupImgLoader< T >

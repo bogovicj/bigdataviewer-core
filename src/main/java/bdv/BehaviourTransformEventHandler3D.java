@@ -1,15 +1,42 @@
+/*-
+ * #%L
+ * BigDataViewer core classes with minimal dependencies
+ * %%
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
+ * %%
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ * #L%
+ */
 package bdv;
 
 import org.scijava.ui.behaviour.Behaviour;
-import org.scijava.ui.behaviour.BehaviourMap;
 import org.scijava.ui.behaviour.ClickBehaviour;
 import org.scijava.ui.behaviour.DragBehaviour;
-import org.scijava.ui.behaviour.InputTriggerAdder;
-import org.scijava.ui.behaviour.InputTriggerMap;
 import org.scijava.ui.behaviour.ScrollBehaviour;
 import org.scijava.ui.behaviour.io.InputTriggerConfig;
+import org.scijava.ui.behaviour.util.Behaviours;
+import org.scijava.ui.behaviour.util.TriggerBehaviourBindings;
 
-import bdv.viewer.TriggerBehaviourBindings;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.ui.TransformEventHandler;
 import net.imglib2.ui.TransformEventHandlerFactory;
@@ -49,46 +76,42 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 	/**
 	 * Current source to screen transform.
 	 */
-	private final AffineTransform3D affine = new AffineTransform3D();
+	protected final AffineTransform3D affine = new AffineTransform3D();
 
 	/**
 	 * Whom to notify when the {@link #affine current transform} is changed.
 	 */
 	private TransformListener< AffineTransform3D > listener;
 
-	private final BehaviourMap behaviourMap = new BehaviourMap();
-
-	private final InputTriggerMap inputMap = new InputTriggerMap();
-
-	private final InputTriggerAdder inputAdder;
-
 	/**
 	 * Copy of {@link #affine current transform} when mouse dragging started.
 	 */
-	final private AffineTransform3D affineDragStart = new AffineTransform3D();
+	final protected AffineTransform3D affineDragStart = new AffineTransform3D();
 
 	/**
 	 * Coordinates where mouse dragging started.
 	 */
-	private double oX, oY;
+	protected double oX, oY;
 
 	/**
 	 * Current rotation axis for rotating with keyboard, indexed {@code x->0, y->1,
 	 * z->2}.
 	 */
-	private int axis = 0;
+	protected int axis = 0;
 
 	/**
 	 * The screen size of the canvas (the component displaying the image and
 	 * generating mouse events).
 	 */
-	private int canvasW = 1, canvasH = 1;
+	protected int canvasW = 1, canvasH = 1;
 
 	/**
 	 * Screen coordinates to keep centered while zooming or rotating with the
 	 * keyboard. These are set to <em>(canvasW/2, canvasH/2)</em>
 	 */
-	private int centerX = 0, centerY = 0;
+	protected int centerX = 0, centerY = 0;
+
+	protected final Behaviours behaviours;
 
 	public BehaviourTransformEventHandler3D( final TransformListener< AffineTransform3D > listener, final InputTriggerConfig config )
 	{
@@ -113,32 +136,31 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		final String KEY_FORWARD_Z = "forward z";
 		final String KEY_BACKWARD_Z = "backward z";
 
-		inputAdder = config.inputTriggerAdder( inputMap, "bdv" );
+		behaviours = new Behaviours( config, "bdv" );
 
-		new TranslateXY( DRAG_TRANSLATE, "button2", "button3" ).register();
-		new Zoom( speed[ 0 ], ZOOM_NORMAL, "meta scroll", "ctrl shift scroll" ).register();
-		new SelectRotationAxis( 0, SELECT_AXIS_X, "X" ).register();
-		new SelectRotationAxis( 1, SELECT_AXIS_Y, "Y" ).register();
-		new SelectRotationAxis( 2, SELECT_AXIS_Z, "Z" ).register();
+		behaviours.behaviour( new TranslateXY(), DRAG_TRANSLATE, "button2", "button3" );
+		behaviours.behaviour( new Zoom( speed[ 0 ] ), ZOOM_NORMAL, "meta scroll", "ctrl shift scroll" );
+		behaviours.behaviour( new SelectRotationAxis( 0 ), SELECT_AXIS_X, "X" );
+		behaviours.behaviour( new SelectRotationAxis( 1 ), SELECT_AXIS_Y, "Y" );
+		behaviours.behaviour( new SelectRotationAxis( 2 ), SELECT_AXIS_Z, "Z" );
 
 		for ( int s = 0; s < 3; ++s )
 		{
-			new Rotate( speed[ s ], DRAG_ROTATE + SPEED_NAME[ s ], speedMod[ s ] + "button1" ).register();
-			new TranslateZ( speed[ s ], SCROLL_Z + SPEED_NAME[ s ], speedMod[ s ] + "scroll" ).register();
-			new KeyRotate( speed[ s ], ROTATE_LEFT + SPEED_NAME[ s ], speedMod[ s ] + "LEFT" ).register();
-			new KeyRotate( -speed[ s ], ROTATE_RIGHT + SPEED_NAME[ s ], speedMod[ s ] + "RIGHT" ).register();
-			new KeyZoom( speed[ s ], KEY_ZOOM_IN + SPEED_NAME[ s ], speedMod[ s ] + "UP" ).register();
-			new KeyZoom( -speed[ s ], KEY_ZOOM_OUT + SPEED_NAME[ s ], speedMod[ s ] + "DOWN" ).register();
-			new KeyTranslateZ( speed[ s ], KEY_FORWARD_Z + SPEED_NAME[ s ], speedMod[ s ] + "COMMA" ).register();
-			new KeyTranslateZ( -speed[ s ], KEY_BACKWARD_Z + SPEED_NAME[ s ], speedMod[ s ] + "PERIOD" ).register();
+			behaviours.behaviour( new Rotate( speed[ s ] ), DRAG_ROTATE + SPEED_NAME[ s ], speedMod[ s ] + "button1" );
+			behaviours.behaviour( new TranslateZ( speed[ s ] ), SCROLL_Z + SPEED_NAME[ s ], speedMod[ s ] + "scroll" );
+			behaviours.behaviour( new KeyRotate( speed[ s ] ), ROTATE_LEFT + SPEED_NAME[ s ], speedMod[ s ] + "LEFT" );
+			behaviours.behaviour( new KeyRotate( -speed[ s ] ), ROTATE_RIGHT + SPEED_NAME[ s ], speedMod[ s ] + "RIGHT" );
+			behaviours.behaviour( new KeyZoom( speed[ s ] ), KEY_ZOOM_IN + SPEED_NAME[ s ], speedMod[ s ] + "UP" );
+			behaviours.behaviour( new KeyZoom( -speed[ s ] ), KEY_ZOOM_OUT + SPEED_NAME[ s ], speedMod[ s ] + "DOWN" );
+			behaviours.behaviour( new KeyTranslateZ( speed[ s ] ), KEY_FORWARD_Z + SPEED_NAME[ s ], speedMod[ s ] + "COMMA" );
+			behaviours.behaviour( new KeyTranslateZ( -speed[ s ] ), KEY_BACKWARD_Z + SPEED_NAME[ s ], speedMod[ s ] + "PERIOD" );
 		}
 	}
 
 	@Override
 	public void install( final TriggerBehaviourBindings bindings )
 	{
-		bindings.addBehaviourMap( "transform", behaviourMap );
-		bindings.addInputTriggerMap( "transform", inputMap );
+		behaviours.install( bindings, "transform" );
 	}
 
 	@Override
@@ -162,6 +184,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 	@Override
 	public void setCanvasSize( final int width, final int height, final boolean updateTransform )
 	{
+		if ( width == 0 || height == 0 ) {
+			// NB: We are probably in some intermediate layout scenario.
+			// Attempting to trigger a transform update with 0 size will result
+			// in the exception "Matrix is singular" from imglib2-realtrasform.
+			return;
+		}
 		if ( updateTransform )
 		{
 			synchronized ( affine )
@@ -204,11 +232,11 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 	/**
 	 * One step of rotation (radian).
 	 */
-	final private static double step = Math.PI / 180;
+	final protected static double step = Math.PI / 180;
 
-	final private static String NL = System.getProperty( "line.separator" );
+	final protected static String NL = System.getProperty( "line.separator" );
 
-	final private static String helpString =
+	final protected static String helpString =
 			"Mouse control:" + NL + " " + NL +
 					"Pan and tilt the volume by left-click and dragging the image in the canvas, " + NL +
 					"move the volume by middle-or-right-click and dragging the image in the canvas, " + NL +
@@ -259,32 +287,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		affine.set( affine.get( 1, 3 ) + centerY, 1, 3 );
 	}
 
-	private abstract class SelfRegisteringBehaviour implements Behaviour
-	{
-		private final String name;
-
-		private final String[] defaultTriggers;
-
-		public SelfRegisteringBehaviour( final String name, final String ... defaultTriggers )
-		{
-			this.name = name;
-			this.defaultTriggers = defaultTriggers;
-		}
-
-		public void register()
-		{
-			behaviourMap.put( name, this );
-			inputAdder.put( name, defaultTriggers );
-		}
-	}
-
-	private class Rotate extends SelfRegisteringBehaviour implements DragBehaviour
+	private class Rotate implements DragBehaviour
 	{
 		private final double speed;
 
-		public Rotate( final double speed, final String name, final String ... defaultTriggers )
+		public Rotate( final double speed )
 		{
-			super( name, defaultTriggers );
 			this.speed = speed;
 		}
 
@@ -329,13 +337,8 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		{}
 	}
 
-	private class TranslateXY extends SelfRegisteringBehaviour implements DragBehaviour
+	private class TranslateXY implements DragBehaviour
 	{
-		public TranslateXY( final String name, final String ... defaultTriggers )
-		{
-			super( name, defaultTriggers );
-		}
-
 		@Override
 		public void init( final int x, final int y )
 		{
@@ -367,13 +370,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		{}
 	}
 
-	private class TranslateZ extends SelfRegisteringBehaviour implements ScrollBehaviour
+	private class TranslateZ implements ScrollBehaviour
 	{
 		private final double speed;
 
-		public TranslateZ( final double speed, final String name, final String ... defaultTriggers )
+		public TranslateZ( final double speed )
 		{
-			super( name, defaultTriggers );
 			this.speed = speed;
 		}
 
@@ -390,13 +392,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		}
 	}
 
-	private class Zoom extends SelfRegisteringBehaviour implements ScrollBehaviour
+	private class Zoom implements ScrollBehaviour
 	{
 		private final double speed;
 
-		public Zoom( final double speed, final String name, final String ... defaultTriggers )
+		public Zoom( final double speed )
 		{
-			super( name, defaultTriggers );
 			this.speed = speed;
 		}
 
@@ -416,13 +417,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		}
 	}
 
-	private class SelectRotationAxis extends SelfRegisteringBehaviour implements ClickBehaviour
+	private class SelectRotationAxis implements ClickBehaviour
 	{
 		private final int axis;
 
-		public SelectRotationAxis( final int axis, final String name, final String ... defaultTriggers )
+		public SelectRotationAxis( final int axis )
 		{
-			super( name, defaultTriggers );
 			this.axis = axis;
 		}
 
@@ -433,13 +433,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		}
 	}
 
-	private class KeyRotate extends SelfRegisteringBehaviour implements ClickBehaviour
+	private class KeyRotate implements ClickBehaviour
 	{
 		private final double speed;
 
-		public KeyRotate( final double speed, final String name, final String ... defaultTriggers )
+		public KeyRotate( final double speed )
 		{
-			super( name, defaultTriggers );
 			this.speed = speed;
 		}
 
@@ -454,13 +453,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		}
 	}
 
-	private class KeyZoom extends SelfRegisteringBehaviour implements ClickBehaviour
+	private class KeyZoom implements ClickBehaviour
 	{
 		private final double dScale;
 
-		public KeyZoom( final double speed, final String name, final String ... defaultTriggers )
+		public KeyZoom( final double speed )
 		{
-			super( name, defaultTriggers );
 			if ( speed > 0 )
 				dScale = 1.0 + 0.1 * speed;
 			else
@@ -478,13 +476,12 @@ public class BehaviourTransformEventHandler3D implements BehaviourTransformEvent
 		}
 	}
 
-	private class KeyTranslateZ extends SelfRegisteringBehaviour implements ClickBehaviour
+	private class KeyTranslateZ implements ClickBehaviour
 	{
 		private final double speed;
 
-		public KeyTranslateZ( final double speed, final String name, final String ... defaultTriggers )
+		public KeyTranslateZ( final double speed )
 		{
-			super( name, defaultTriggers );
 			this.speed = speed;
 		}
 

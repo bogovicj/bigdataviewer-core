@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -112,6 +113,11 @@ public class ViewerState
 	 */
 	private int currentTimepoint;
 
+	public ViewerState( final List< SourceAndConverter< ? > > sources, final int numTimePoints )
+	{
+		this( sources, null, numTimePoints );
+	}
+
 	/**
 	 *
 	 * @param sources
@@ -121,13 +127,11 @@ public class ViewerState
 	 */
 	public ViewerState( final List< SourceAndConverter< ? > > sources, final List< SourceGroup > sourceGroups, final int numTimePoints )
 	{
-		this.sources = new ArrayList< SourceState< ? > >( sources.size() );
+		this.sources = new ArrayList<>( sources.size() );
 		for ( final SourceAndConverter< ? > source : sources )
 			this.sources.add( SourceState.create( source, this ) );
 		unmodifiableSources = Collections.unmodifiableList( this.sources );
-		groups = new ArrayList< SourceGroup >( sourceGroups.size() );
-		for ( final SourceGroup g : sourceGroups )
-			groups.add( g.copy( this ) );
+		groups = ( sourceGroups == null ) ? new ArrayList<>() : new ArrayList<>( sourceGroups );
 		unmodifiableGroups = Collections.unmodifiableList( this.groups );
 		this.numTimepoints = numTimePoints;
 
@@ -135,7 +139,7 @@ public class ViewerState
 		interpolation = NEARESTNEIGHBOR;
 		displayMode = SINGLE;
 		currentSource = sources.isEmpty() ? -1 : 0;
-		currentGroup = 0;
+		currentGroup = groups.isEmpty() ? -1 : 0;
 		currentTimepoint = 0;
 	}
 
@@ -145,13 +149,13 @@ public class ViewerState
 	 */
 	protected ViewerState( final ViewerState s )
 	{
-		sources = new ArrayList< SourceState< ? > >( s.sources.size() );
+		sources = new ArrayList<>( s.sources.size() );
 		for ( final SourceState< ? > source : s.sources )
 			this.sources.add( source.copy( this ) );
 		unmodifiableSources = Collections.unmodifiableList( sources );
-		groups = new ArrayList< SourceGroup >( s.groups.size() );
+		groups = new ArrayList<>( s.groups.size() );
 		for ( final SourceGroup group : s.groups )
-			this.groups.add( group.copy( this ) );
+			groups.add( group.copy() );
 		unmodifiableGroups = Collections.unmodifiableList( groups );
 		numTimepoints = s.numTimepoints;
 		viewerTransform = s.viewerTransform.copy();
@@ -162,7 +166,7 @@ public class ViewerState
 		currentTimepoint = s.currentTimepoint;
 	}
 
-	public ViewerState copy()
+	public synchronized ViewerState copy()
 	{
 		return new ViewerState( this );
 	}
@@ -226,7 +230,7 @@ public class ViewerState
 	}
 
 	/**
-	 * Get the index of the current source.
+	 * Get the index of the current group.
 	 */
 	public synchronized int getCurrentGroup()
 	{
@@ -234,7 +238,7 @@ public class ViewerState
 	}
 
 	/**
-	 * Make the source with the given index current.
+	 * Make the group with the given index current.
 	 */
 	public synchronized void setCurrentGroup( final int index )
 	{
@@ -244,6 +248,16 @@ public class ViewerState
 			currentGroup = index;
 			groups.get( currentGroup ).setCurrent( true );
 		}
+	}
+
+	/**
+	 * Make the given group current.
+	 */
+	public synchronized void setCurrentGroup( final SourceGroup group )
+	{
+		final int i = getGroupIndex( group );
+		if ( i >= 0 )
+			setCurrentGroup( i );
 	}
 
 	/**
@@ -266,20 +280,21 @@ public class ViewerState
 		interpolation = method;
 	}
 
-	// TODO: replace by getDisplayMode()
 	/**
 	 * Is the display mode <em>single-source</em>? In <em>single-source</em>
 	 * mode, only the current source (SPIM angle). Otherwise, in <em>fused</em>
 	 * mode, all active sources are blended.
 	 *
 	 * @return whether the display mode is <em>single-source</em>.
+	 *
+	 * @deprecated replaced by {@link #getDisplayMode()}
 	 */
+	@Deprecated
 	public synchronized boolean isSingleSourceMode()
 	{
 		return displayMode == SINGLE;
 	}
 
-	// TODO: replace by setDisplayMode();
 	/**
 	 * Set the display mode to <em>single-source</em> (true) or <em>fused</em>
 	 * (false). In <em>single-source</em> mode, only the current source (SPIM
@@ -288,7 +303,10 @@ public class ViewerState
 	 * @param singleSourceMode
 	 *            If true, set <em>single-source</em> mode. If false, set
 	 *            <em>fused</em> mode.
+	 *
+	 * @deprecated replaced by {@link #setDisplayMode(DisplayMode)}
 	 */
+	@Deprecated
 	public synchronized void setSingleSourceMode( final boolean singleSourceMode )
 	{
 		if ( singleSourceMode )
@@ -298,14 +316,35 @@ public class ViewerState
 	}
 
 	/**
-	 * TODO
+	 * Set the {@link DisplayMode}.
+	 *
+	 * <ul>
+	 * <li>In <em>single-source</em> mode, only the current source (SPIM angle) is shown.</li>
+	 * <li>In <em>fused</em> mode, all active sources are blended.</li>
+	 * <li>In <em>single-group</em> mode, all sources of the current group are blended.</li>
+	 * <li>In <em>fused group</em> mode, all sources of all active groups are blended.</li>
+	 * </ul>
+	 *
 	 * @param mode
+	 *            the display mode
 	 */
 	public synchronized void setDisplayMode( final DisplayMode mode )
 	{
 		displayMode = mode;
 	}
 
+	/**
+	 * Get the current {@link DisplayMode}.
+	 *
+	 * <ul>
+	 * <li>In <em>single-source</em> mode, only the current source (SPIM angle) is shown.</li>
+	 * <li>In <em>fused</em> mode, all active sources are blended.</li>
+	 * <li>In <em>single-group</em> mode, all sources of the current group are blended.</li>
+	 * <li>In <em>fused group</em> mode, all sources of all active groups are blended.</li>
+	 * </ul>
+	 *
+	 * @return the current display mode
+	 */
 	public synchronized DisplayMode getDisplayMode()
 	{
 		return displayMode;
@@ -403,7 +442,7 @@ public class ViewerState
 		for( final SourceGroup group : groups )
 		{
 			final SortedSet< Integer > ids = group.getSourceIds();
-			final ArrayList< Integer > oldids = new ArrayList< Integer >( ids );
+			final ArrayList< Integer > oldids = new ArrayList<>( ids );
 			ids.clear();
 			for ( final int id : oldids )
 			{
@@ -413,6 +452,34 @@ public class ViewerState
 					ids.add( id - 1 );
 			}
 		}
+	}
+
+	public synchronized void addGroup( final SourceGroup group )
+	{
+		if ( !groups.contains( group ) )
+		{
+			groups.add( group );
+			if ( currentGroup < 0 )
+				currentGroup = 0;
+		}
+	}
+
+	public synchronized void removeGroup( final SourceGroup group )
+	{
+		final int i = groups.indexOf( group );
+		if ( i >= 0 )
+			removeGroup( i );
+	}
+
+	protected void removeGroup( final int index )
+	{
+		groups.remove( index );
+		if ( groups.isEmpty() )
+			currentGroup = -1;
+		else if ( currentGroup == index )
+			currentGroup = 0;
+		else if ( currentGroup > index )
+			--currentGroup;
 	}
 
 	public synchronized boolean isSourceVisible( final int index )
@@ -446,7 +513,7 @@ public class ViewerState
 	 */
 	public synchronized List< Integer > getVisibleSourceIndices()
 	{
-		final ArrayList< Integer > visible = new ArrayList< Integer >();
+		final ArrayList< Integer > visible = new ArrayList<>();
 		switch ( displayMode )
 		{
 		case SINGLE:
@@ -464,11 +531,11 @@ public class ViewerState
 					visible.add( i );
 			break;
 		case FUSEDGROUP:
-			final TreeSet< Integer > gactive = new TreeSet< Integer >();
+			final TreeSet< Integer > gactive = new TreeSet<>();
 			for ( final SourceGroup group : groups )
 				if ( group.isActive() )
 					gactive.addAll( group.getSourceIds() );
-			for ( final int sourceId : new ArrayList< Integer >( gactive ) )
+			for ( final int sourceId : new ArrayList<>( gactive ) )
 				if ( isPresent( sourceId ) )
 					visible.add( sourceId );
 			break;
@@ -535,7 +602,7 @@ public class ViewerState
 
 	/**
 	 * Get index of (first) {@link SourceState} that matches the given
-	 * {@link Source}.
+	 * {@link Source} or {@code -1} if not found.
 	 */
 	private int getSourceIndex( final Source< ? > source )
 	{
@@ -546,5 +613,14 @@ public class ViewerState
 				return i;
 		}
 		return -1;
+	}
+
+	/**
+	 * Get index of (first) {@link SourceGroup} that matches the given
+	 * {@code group} or {@code -1} if not found.
+	 */
+	private int getGroupIndex( final SourceGroup group )
+	{
+		return groups.indexOf( group );
 	}
 }

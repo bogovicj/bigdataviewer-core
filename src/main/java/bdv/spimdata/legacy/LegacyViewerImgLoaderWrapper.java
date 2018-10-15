@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,7 +38,7 @@ import net.imglib2.Volatile;
 import net.imglib2.realtransform.AffineTransform3D;
 import bdv.ViewerImgLoader;
 import bdv.ViewerSetupImgLoader;
-import bdv.img.cache.Cache;
+import bdv.cache.CacheControl;
 
 //@Deprecated
 public class LegacyViewerImgLoaderWrapper< T, V extends Volatile< T >, I extends LegacyViewerImgLoader< T, V > > implements ViewerImgLoader
@@ -49,7 +50,7 @@ public class LegacyViewerImgLoaderWrapper< T, V extends Volatile< T >, I extends
 	public LegacyViewerImgLoaderWrapper( final I legacyImgLoader )
 	{
 		this.legacyImgLoader = legacyImgLoader;
-		setupImgLoaders = new HashMap< Integer, SetupImgLoaderWrapper >();
+		setupImgLoaders = new HashMap<>();
 	}
 
 	@Override
@@ -65,7 +66,7 @@ public class LegacyViewerImgLoaderWrapper< T, V extends Volatile< T >, I extends
 	}
 
 	@Override
-	public Cache getCache()
+	public CacheControl getCacheControl()
 	{
 		return legacyImgLoader.getCache();
 	}

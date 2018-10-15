@@ -2,7 +2,8 @@
  * #%L
  * BigDataViewer core classes with minimal dependencies
  * %%
- * Copyright (C) 2012 - 2015 BigDataViewer authors
+ * Copyright (C) 2012 - 2016 Tobias Pietzsch, Stephan Saalfeld, Stephan Preibisch,
+ * Jean-Yves Tinevez, HongKee Moon, Johannes Schindelin, Curtis Rueden, John Bogovic
  * %%
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,18 +27,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-package bdv.img.cache;
+package bdv.cache;
 
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import bdv.img.cache.VolatileGlobalCellCache;
 
 /**
- * This is the part of the {@link VolatileGlobalCellCache} interface that is exposed
- * to the renderer directly (that is, not via images). It comprises methods to
- * control cache behavior. If the renderer is used without
- * {@link VolatileGlobalCellCache}, these can be simply implemented to do nothing.
+ * This is the part of the {@link VolatileGlobalCellCache} interface that is
+ * exposed to the renderer directly (that is, not via images). It comprises
+ * methods to control cache behavior. If the renderer is used without
+ * {@link VolatileGlobalCellCache}, these can be simply implemented to do
+ * nothing.
  *
  * @author Tobias Pietzsch &lt;tobias.pietzsch@gmail.com&gt;
  */
-public interface Cache
+public interface CacheControl
 {
 	/**
 	 * Prepare the cache for providing data for the "next frame".
@@ -52,34 +57,48 @@ public interface Cache
 	public void prepareNextFrame();
 
 	/**
-	 * (Re-)initialize the IO time budget.
+	 * {@link CacheControl} that does nothing.
 	 */
-	public void initIoTimeBudget( final long[] partialBudget );
-
-	/**
-	 * Get the {@link CacheIoTiming} that provides per thread-group IO
-	 * statistics and budget.
-	 */
-	public CacheIoTiming getCacheIoTiming();
-
-	public static class Dummy implements Cache
+	public static class Dummy implements CacheControl
 	{
-		private CacheIoTiming cacheIoTiming;
-
 		@Override
 		public void prepareNextFrame()
 		{}
+	}
 
-		@Override
-		public void initIoTimeBudget( final long[] partialBudget )
-		{}
+	/**
+	 * {@link CacheControl} backed by a set of {@link CacheControl}s.
+	 * {@link #prepareNextFrame()} forwards to all of them.
+	 */
+	public static class CacheControls implements CacheControl
+	{
+		private final CopyOnWriteArrayList< CacheControl > cacheControls = new CopyOnWriteArrayList<>();
 
-		@Override
-		public CacheIoTiming getCacheIoTiming()
+		public synchronized void addCacheControl( final CacheControl cacheControl, final int index )
 		{
-			if ( cacheIoTiming == null )
-				cacheIoTiming = new CacheIoTiming();
-			return cacheIoTiming;
+			cacheControls.remove( cacheControl );
+			final int s = cacheControls.size();
+			cacheControls.add( index < 0 ? 0 : index > s ? s : index, cacheControl );
+		}
+
+		public synchronized void addCacheControl( final CacheControl cacheControl )
+		{
+			if ( !cacheControls.contains( cacheControl ) )
+			{
+				cacheControls.add( cacheControl );
+			}
+		}
+
+		public synchronized void removeCacheControl( final CacheControl cacheControl )
+		{
+			cacheControls.remove( cacheControl );
+		}
+
+		@Override
+		public void prepareNextFrame()
+		{
+			for ( final CacheControl c : cacheControls )
+				c.prepareNextFrame();
 		}
 	}
 }
