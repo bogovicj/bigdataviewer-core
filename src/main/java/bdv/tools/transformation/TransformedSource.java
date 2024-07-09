@@ -32,6 +32,7 @@ import bdv.viewer.Interpolation;
 import bdv.viewer.Source;
 import bdv.viewer.render.DefaultMipmapOrdering;
 import bdv.viewer.render.MipmapOrdering;
+import mpicbg.spim.data.sequence.FinalVoxelDimensions;
 import mpicbg.spim.data.sequence.VoxelDimensions;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealRandomAccessible;
@@ -85,6 +86,8 @@ public class TransformedSource< T > implements Source< T >, MipmapOrdering
 	 * optional new name. if null, the name of the original source will be used.
 	 */
 	protected final String name;
+
+	protected VoxelDimensions voxelDimensions;
 
 	/**
 	 * Instantiates a new {@link TransformedSource} wrapping the specified
@@ -146,6 +149,7 @@ public class TransformedSource< T > implements Source< T >, MipmapOrdering
 		this.fixedTransform = fixedTransform;
 		this.sourceTransform = sourceTransform;
 		this.composed = new AffineTransform3D();
+		this.voxelDimensions = new FinalVoxelDimensions( source.getVoxelDimensions().unit(), source.getVoxelDimensions().dimensionsAsDoubleArray() );
 	}
 
 	@Override
@@ -274,7 +278,12 @@ public class TransformedSource< T > implements Source< T >, MipmapOrdering
 	@Override
 	public VoxelDimensions getVoxelDimensions()
 	{
-		return source.getVoxelDimensions();
+		return voxelDimensions;
+	}
+
+	public void setVoxelDimensions( final VoxelDimensions voxelDimensions )
+	{
+		this.voxelDimensions = voxelDimensions;
 	}
 
 	@Override
