@@ -61,10 +61,15 @@ import net.imglib2.view.Views;
  * The supplied transform is interpreted in the world coordinate system that the
  * wrapped source maps into via its {@link Source#getSourceTransform
  * getSourceTransform}. Since the images returned by {@link #getSource} and
- * {@@link #getInterpolatedSource} are expected to be in the scale levels' pixel
+ * {@link #getInterpolatedSource} are expected to be in the scale levels' pixel
  * coordinates, this class internally maps pixel coordinate to world coordinates
  * before applying the provided transformation, then maps back to pixel
  * coordinates.
+ * <p>
+ * The inverse direction of the provided transformation is used for pixel
+ * renderings, and therefore should be fast. The forward direction is used only
+ * for bounding interval estimation. If one direction of the provided transform
+ * is iteratively estimated, callers should ensure it is the inverse direction.
  * <p>
  * The bounding intervals for each mipmap level are estimated using the passed
  * {@code boundingBoxEstimator}, using {@link FacesSteps} with 10 steps as the
