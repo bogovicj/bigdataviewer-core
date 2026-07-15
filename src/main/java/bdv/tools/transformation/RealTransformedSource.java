@@ -29,7 +29,6 @@
 package bdv.tools.transformation;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -39,24 +38,29 @@ import bdv.viewer.Source;
 import bdv.viewer.render.DefaultMipmapOrdering;
 import bdv.viewer.render.MipmapOrdering;
 import mpicbg.spim.data.sequence.VoxelDimensions;
+import net.imglib2.FinalRealInterval;
 import net.imglib2.Interval;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.RealInterval;
 import net.imglib2.RealRandomAccessible;
+import net.imglib2.realtransform.AffineGet;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.realtransform.InvertibleRealTransform;
-import net.imglib2.realtransform.InvertibleRealTransformSequence;
 import net.imglib2.realtransform.RealTransform;
 import net.imglib2.realtransform.RealTransformRealRandomAccessible;
+import net.imglib2.realtransform.RealTransformSequence;
+import net.imglib2.realtransform.interval.Corners;
 import net.imglib2.realtransform.interval.FacesSteps;
 import net.imglib2.realtransform.interval.IntervalSamplingMethod;
+import net.imglib2.realtransform.inverse.WrappedIterativeInvertibleRealTransform;
 import net.imglib2.util.Intervals;
 import net.imglib2.view.Views;
 
 /**
  * A {@link Source} that wraps another {@link Source} and warps it with an
- * {@link InvertibleRealTransform} applied in <em>world</em> coordinates. This
- * class is intended for use with general, potentially non-affine
- * transformations. For affines, use {@link TransformedSource}.
+ * {@link RealTransform} applied in <em>world</em> coordinates. This class is
+ * intended for use with general, potentially non-affine transformations. For
+ * affines, use {@link TransformedSource}.
  * <p>
  * The supplied transform is interpreted in the world coordinate system that the
  * wrapped source maps into via its {@link Source#getSourceTransform
@@ -66,19 +70,20 @@ import net.imglib2.view.Views;
  * before applying the provided transformation, then maps back to pixel
  * coordinates.
  * <p>
- * The inverse direction of the provided transformation is used for pixel
- * renderings, and therefore should be fast. The forward direction is used only
- * for bounding interval estimation. If one direction of the provided transform
- * is iteratively estimated, callers should ensure it is the inverse direction.
+ * The provided transformation must be the inverse transformation - taking
+ * pixels from target space to source space (see
+ * {@link RealTransformRealRandomAccessible). Note this is the opposite convention
+ * as used by {@code TransformedSource}. 
  * <p>
  * The bounding intervals for each mipmap level are estimated using the passed
- * {@code boundingBoxEstimator}, using {@link FacesSteps} with 10 steps as the
+ * {@code boundingBoxEstimator}, using {@link FacesSteps} with 5 steps as the
  * default.
  *
  * @param <T>
  *            the type of the original source
  */
-public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
+public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
+{
 	protected final Source< T > source;
 
 	/**
@@ -95,7 +100,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	/**
 	 * The transformation to apply.
 	 */
-	protected InvertibleRealTransform transform;
+	protected RealTransform transform;
 
 	/**
 	 * Pre-computed total transform, one per mipmap level. For each level, the
@@ -103,7 +108,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	 * transform, applies {@link #transform}, then maps back. Rebuilt whenever
 	 * {@link #setTransform} is called.
 	 */
-	private List< InvertibleRealTransformSequence > transformSequences;
+	private List< RealTransformSequence > transformSequences;
 
 	/**
 	 * Pre-computed bounding interval for {@link #getSource}, one per mipmap
@@ -113,8 +118,6 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	private List< Interval > boundingIntervals;
 
 	private final Supplier< Boolean > boundingBoxCullingSupplier;
-
-	private final BiFunction< RealTransform, Interval, Interval > boundingBoxEstimator;
 
 	/**
 	 * Wraps {@code source} with the given world-coordinate {@code transform},
@@ -129,14 +132,9 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	 *            the transform to apply, in world coordinates
 	 */
 	public RealTransformedSource( final Source< T > source, final String name,
-			final InvertibleRealTransform transform )
+			final RealTransform transform )
 	{
-		this( source, name, transform,
-				(t, i) -> {
-					return Intervals.smallestContainingInterval(
-							t.boundingInterval(i, facesIsotropicSteps(i.numDimensions(), 10)));
-				},
-				null );
+		this( source, name, transform, appropriateEstimator(transform, 5), null );
 	}
 
 	/**
@@ -156,8 +154,8 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	 *            the transform to apply, in world coordinates
 	 */
 	public RealTransformedSource( final Source< T > source, final String name,
-		    final BiFunction< RealTransform, Interval, Interval > boundingBoxEstimator,
-			final InvertibleRealTransform transform )
+		    final BiFunction< RealTransform, RealInterval, RealInterval > boundingBoxEstimator,
+			final RealTransform transform )
 	{
 		this( source, name, transform, boundingBoxEstimator, null );
 	}
@@ -179,15 +177,14 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	 *            if {@code null}, the wrapped source's setting is used
 	 */
 	public RealTransformedSource( final Source< T > source, final String name,
-		    final InvertibleRealTransform transform,
-		    final BiFunction< RealTransform, Interval, Interval > boundingBoxEstimator,
+		    final RealTransform transform,
+		    final BiFunction< RealTransform, RealInterval, RealInterval > boundingBoxEstimator,
 			final Supplier< Boolean > doBoundingBoxCulling )
 	{
 		this.source = source;
 		this.name = name;
-		this.boundingBoxEstimator = boundingBoxEstimator;
 		this.boundingBoxCullingSupplier = doBoundingBoxCulling;
-		setTransform( transform );
+		setTransform( transform, boundingBoxEstimator );
 
 		sourceMipmapOrdering = MipmapOrdering.class.isInstance( source ) ?
 				( MipmapOrdering ) source : new DefaultMipmapOrdering( source );
@@ -222,28 +219,162 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	 * @param transform
 	 *            the transform to apply, in world coordinates
 	 */
-	public void setTransform( final InvertibleRealTransform transform )
+	public void setTransform( final RealTransform transform, BiFunction<RealTransform, RealInterval, RealInterval> boundingBoxEstimator)
 	{
 		this.transform = transform;
 
 		final int numLevels = getNumMipmapLevels();
-		final List< InvertibleRealTransformSequence > sequences = new ArrayList<>( numLevels );
+		final List< RealTransformSequence > sequences = new ArrayList<>( numLevels );
 		final List< Interval > intervals = new ArrayList<>( numLevels );
 		for ( int level = 0; level < numLevels; level++ )
 		{
 			final AffineTransform3D affine = new AffineTransform3D();
 			source.getSourceTransform( 0, level, affine );
 
-			final InvertibleRealTransformSequence seq = new InvertibleRealTransformSequence();
+			final RealTransformSequence seq = new RealTransformSequence();
 			seq.add( affine );
 			seq.add( transform.copy() );
 			seq.add( affine.inverse() );
 			sequences.add( seq );
 
-			intervals.add( boundingBoxEstimator.apply( seq, source.getSource( 0, level ) ) );
+			intervals.add(Intervals.smallestContainingInterval(
+					estimateBounds(affine, boundingBoxEstimator, transform, source.getSource(0, level))));
 		}
 		transformSequences = sequences;
 		boundingIntervals = intervals;
+	}
+
+	public void setTransform(final RealTransform transform) {
+
+		// create an appropriate BiFunction for this class of transform
+		setTransform(transform, appropriateEstimator(transform, 5));
+	}
+	
+	/**
+	 * Return an appropriate bounding box estimator for the given transform.
+	 * Uses a {@link FacesSteps} instance with the given number of steps, unless
+	 * the transform is affine, in which case it uses {@link Corners}.
+	 *
+	 * @param transform
+	 * 	the transform
+	 * @param numStepsLongestDimension
+	 * 	if needed, the number of steps 
+	 * @return
+	 */
+	private static BiFunction<RealTransform, RealInterval, RealInterval> appropriateEstimator(
+			final RealTransform transform, int numStepsLongestDimension) {
+
+		/**
+		 * TODO drop this in favor of an identical method in imglib2-realtransform
+		 * once an equivalent is available there.
+		 */
+		final BiFunction<RealTransform, RealInterval, RealInterval> estimator = (t, i) -> {
+			if (t instanceof AffineGet) {
+				// some AffineGet implementations ignore the IntervalSamplingMethod,
+				// but even if used, CORNERS is appropriate for an affine
+				return ((AffineGet)t).boundingInterval(i, IntervalSamplingMethod.CORNERS);
+			}
+
+			return facesEstimator(i, numStepsLongestDimension).bounds(i, t);
+		};
+		return estimator;
+	}
+
+	/**
+	 * Returns an {@link FacesSteps} interval sampler with steps chosen such
+	 * that the largest dimensions has the specified number of steps. Other
+	 * dimensions should have a number of steps that has the same spacing as the
+	 * longest dimension. At least two points are sampled for every dimension.
+	 * 
+	 * @param interval
+	 * @param numStepsLongestDimension
+	 * @return
+	 */
+	private static FacesSteps facesEstimator( RealInterval interval, int numStepsLongestDimension ) {
+
+		final int nd = interval.numDimensions();
+
+		double longestWidth = 0.0;
+		for ( int i = 0; i < nd; i++ )
+		{
+			final double w = interval.realMax( i ) - interval.realMin( i );
+			if ( w > longestWidth )
+				longestWidth = w;
+		}
+
+		// the step spacing that yields numStepsLongestDimension steps along the
+		// longest dimension; other dimensions use the same spacing so that the
+		// number of steps is proportional to their width.
+		final double spacing = longestWidth / numStepsLongestDimension;
+
+		final long[] steps = new long[ nd ];
+		for ( int i = 0; i < nd; i++ )
+		{
+			final double w = interval.realMax( i ) - interval.realMin( i );
+			// at least one step (two sampled points) per dimension
+			steps[ i ] = spacing > 0 ? Math.max( 1, Math.round( w / spacing ) ) : 1;
+		}
+
+		return new FacesSteps( steps );
+	}
+
+	/**
+	 * Estimates the world-space {@link RealInterval} that results from mapping
+	 * a pixel {@code interval} to world coordinates with the affine {@code a},
+	 * warping it with the general transform {@code t}, then mapping back to
+	 * pixel coordinates with the inverse of {@code a}.
+	 * <p>
+	 * The affine legs are bounded exactly using their corners; only the
+	 * (potentially non-linear) transform {@code t} is estimated by sampling the
+	 * interval faces, with {@code numStepsLongestDimension} steps along the
+	 * longest dimension.
+	 * <p>
+	 * This method is used so that the provided boundingBoxUpdater can be
+	 * applied to only the world transformation, ignoring the pixelToPhysical
+	 * transformation. Without this, faces bounding box estimator would not be
+	 * able to take into account the physical bounding box.
+	 *
+	 * @param a
+	 *            the affine mapping pixel to world coordinates
+	 * @param boundingBoxUpdater
+	 *            function estimating a bounding box from a transformation
+	 * @param t
+	 *            the general transform applied in world coordinates
+	 * @param interval
+	 *            the pixel interval
+	 * @param numStepsLongestDimension
+	 *            number of face-sampling steps along the longest dimension
+	 * @return the estimated pixel-space bounding interval
+	 */
+	private static RealInterval estimateBounds(
+			final AffineTransform3D pixelToPhysical,
+			final BiFunction<RealTransform, RealInterval, RealInterval> boundingBoxEstimator,
+			final RealTransform t,
+			final Interval interval)
+	{
+		/**
+		 * The total forward transformation needed for bounding box estimation is:
+		 * pixelToPhysical
+		 * t.inverse
+		 * pixelToPhysical.inverse
+		 */
+		final RealInterval physical = pixelToPhysical.estimateBounds(interval);
+		final RealInterval transformedPhysical = boundingBoxEstimator.apply(directOrEstimatedInverse(t), physical);
+		final FinalRealInterval transformedPixel = pixelToPhysical.inverse().estimateBounds(transformedPhysical);
+		return transformedPixel;
+	}
+
+	private static RealTransform directOrEstimatedInverse(RealTransform transform) {
+
+		return makeInvertible(transform).inverse();
+	}
+
+	private static InvertibleRealTransform makeInvertible(RealTransform transform) {
+
+		if (transform instanceof InvertibleRealTransform)
+			return ((InvertibleRealTransform)transform);
+
+		return new WrappedIterativeInvertibleRealTransform<>(transform);
 	}
 
 	public Source< T > getWrappedSource()
@@ -254,16 +385,16 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	@Override
 	public RandomAccessibleInterval< T > getSource( final int t, final int level )
 	{
-		// TODO expose interp method - it probably matters
-		final RealRandomAccessible<T> interpSrc = getInterpolatedSource( t, level, Interpolation.NEARESTNEIGHBOR );
-		return Views.interval( Views.raster(interpSrc), boundingIntervals.get( level ) );
+		// TODO expose interp method? 
+		final RealRandomAccessible< T > interpSrc = getInterpolatedSource( t, level, Interpolation.NEARESTNEIGHBOR );
+		return Views.interval( Views.raster( interpSrc ), boundingIntervals.get( level ) );
 	}
 
 	@Override
 	public RealRandomAccessible< T > getInterpolatedSource( final int t, final int level, final Interpolation method )
 	{
 		final RealRandomAccessible<T> realSrc = source.getInterpolatedSource( t, level, method );
-		return new RealTransformRealRandomAccessible< T, RealTransform >( realSrc, transformSequences.get( level ).inverse() );
+		return new RealTransformRealRandomAccessible< T, RealTransform >( realSrc, transformSequences.get( level ) );
 	}
 
 	@Override
@@ -272,7 +403,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 		source.getSourceTransform( t, level, transform );
 	}
 
-	public InvertibleRealTransform getTransform()
+	public RealTransform getTransform()
 	{
 		return transform;
 	}
@@ -306,12 +437,6 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering {
 	public synchronized MipmapHints getMipmapHints( final AffineTransform3D screenTransform, final int timepoint, final int previousTimepoint )
 	{
 		return sourceMipmapOrdering.getMipmapHints( screenTransform, timepoint, previousTimepoint );
-	}
-
-	private static IntervalSamplingMethod facesIsotropicSteps( int nd, long step)  {
-		final long[] steps = new long[nd];
-		Arrays.fill(steps, step);
-		return new FacesSteps(steps);
 	}
 
 }
