@@ -55,7 +55,8 @@ public class RealTransformedSourceTest
 		final TransformedSource< DoubleType > ts = new TransformedSource<>( base );
 		ts.setFixedTransform( affine );
 
-		final RealTransformedSource< DoubleType > rts = new RealTransformedSource<>( base, "rts", affine );
+		// RealTransformedSource uses the inverse transform
+		final RealTransformedSource< DoubleType > rts = new RealTransformedSource<>( base, "rts", affine.inverse() );
 
 		// transform interpolated sources into world coordinates
 		final AffineTransform3D tsToWorld = new AffineTransform3D();
