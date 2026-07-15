@@ -72,8 +72,8 @@ import net.imglib2.view.Views;
  * <p>
  * The provided transformation must be the inverse transformation - taking
  * pixels from target space to source space (see
- * {@link RealTransformRealRandomAccessible). Note this is the opposite convention
- * as used by {@code TransformedSource}. 
+ * {@link RealTransformRealRandomAccessible}). Note this is the opposite convention
+ * as used by {@code TransformedSource}.
  * <p>
  * The bounding intervals for each mipmap level are estimated using the passed
  * {@code boundingBoxEstimator}, using {@link FacesSteps} with 5 steps as the
