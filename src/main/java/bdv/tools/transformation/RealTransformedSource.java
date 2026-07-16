@@ -121,7 +121,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	/**
 	 * Wraps {@code source} with the given world-coordinate {@code transform},
 	 * using a default bounding-box estimator that samples the interval faces
-	 * (10 steps per axis) and inherits bounding-box culling from {@code source}.
+	 * (5 steps per axis) and inherits bounding-box culling from {@code source}.
 	 *
 	 * @param source
 	 *            the source to warp
@@ -201,18 +201,22 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	}
 
 	/**
-	 * Sets the world-coordinate transform to apply and (re)builds the per-mipmap-level
-	 * caches derived from it.
+	 * Sets the world-coordinate transform to apply and (re)builds the
+	 * per-mipmap-level caches derived from it.
 	 * <p>
 	 * For each level a total transform sequence is precomputed that maps that
 	 * level's pixel coordinates to world via the source transform, applies a
-	 * {@link InvertibleRealTransform#copy() copy} of {@code transform}, then maps
-	 * back to pixels; a copy is used so each sequence has its own instance. The
-	 * bounding interval that {@link #getSource} rasterizes over is estimated once
-	 * per level (at timepoint {@code 0}) using the {@code boundingBoxEstimator}.
+	 * {@link RealTransform#copy() copy} of {@code transform}, then
+	 * maps back to pixels; a copy is used so each sequence has its own
+	 * instance. The bounding interval that {@link #getSource} rasterizes over
+	 * is estimated once per level (at timepoint {@code 0}) using the
+	 * {@code boundingBoxEstimator}.
 	 *
 	 * @param transform
 	 *            the transform to apply, in world coordinates
+	 * @param boundingBoxEstimator
+	 *            used to find the new bounding box after applying the
+	 *            transformation
 	 */
 	public void setTransform( final RealTransform transform, BiFunction<RealTransform, RealInterval, RealInterval> boundingBoxEstimator)
 	{
@@ -239,6 +243,15 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 		boundingIntervals = intervals;
 	}
 
+	/**
+	 * Sets the world-coordinate transform to apply and (re)builds the
+	 * per-mipmap-level caches derived from it, using a default bounding-box
+	 * estimator appropriate for the given transform (see
+	 * {@link #appropriateEstimator}).
+	 *
+	 * @param transform
+	 *            the transform to apply, in world coordinates
+	 */
 	public void setTransform(final RealTransform transform) {
 
 		// create an appropriate BiFunction for this class of transform
@@ -251,10 +264,10 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	 * the transform is affine, in which case it uses {@link Corners}.
 	 *
 	 * @param transform
-	 * 	the transform
+	 *            the transform
 	 * @param numStepsLongestDimension
-	 * 	if needed, the number of steps 
-	 * @return
+	 *            if needed, the number of steps
+	 * @return a bounding-box estimator appropriate for the transform
 	 */
 	private static BiFunction<RealTransform, RealInterval, RealInterval> appropriateEstimator(
 			final RealTransform transform, int numStepsLongestDimension) {
@@ -280,10 +293,13 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	 * that the largest dimensions has the specified number of steps. Other
 	 * dimensions should have a number of steps that has the same spacing as the
 	 * longest dimension. At least two points are sampled for every dimension.
-	 * 
+	 *
 	 * @param interval
+	 *            the interval whose per-dimension widths set the step counts
 	 * @param numStepsLongestDimension
-	 * @return
+	 *            the number of steps to sample along the longest dimension
+	 * @return a {@link FacesSteps} sampler with per-dimension step counts
+	 *         proportional to each dimension's width
 	 */
 	private static FacesSteps facesEstimator( RealInterval interval, int numStepsLongestDimension ) {
 
@@ -315,46 +331,46 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 
 	/**
 	 * Estimates the world-space {@link RealInterval} that results from mapping
-	 * a pixel {@code interval} to world coordinates with the affine {@code a},
-	 * warping it with the general transform {@code t}, then mapping back to
-	 * pixel coordinates with the inverse of {@code a}.
+	 * a pixel interval to world coordinates with the affine {@code pixelToPhysical},
+	 * warping it with the inverse of {@code transform}, then mapping back to
+	 * pixel coordinates with the inverse of {@code pixelToPhysical}.
+	 * <p>
+	 * If {@code transform} is not an {@link InvertibleRealTransform}, the inverse
+	 * is esimated with a {@link WrappedIterativeInvertibleRealTransform}.
 	 * <p>
 	 * The affine legs are bounded exactly using their corners; only the
-	 * (potentially non-linear) transform {@code t} is estimated by sampling the
-	 * interval faces, with {@code numStepsLongestDimension} steps along the
-	 * longest dimension.
+	 * (potentially non-linear) transform {@code transform} is estimated 
+	 * using {@code boundingBoxEstimator}.
 	 * <p>
-	 * This method is used so that the provided boundingBoxUpdater can be
+	 * This method is used so that the provided {@code boundingBoxEstimator} can be
 	 * applied to only the world transformation, ignoring the pixelToPhysical
 	 * transformation. Without this, faces bounding box estimator would not be
 	 * able to take into account the physical bounding box.
 	 *
-	 * @param a
+	 * @param pixelToPhysical 
 	 *            the affine mapping pixel to world coordinates
-	 * @param boundingBoxUpdater
+	 * @param boundingBoxEstimator
 	 *            function estimating a bounding box from a transformation
-	 * @param t
+	 * @param transform
 	 *            the general transform applied in world coordinates
 	 * @param interval
 	 *            the pixel interval
-	 * @param numStepsLongestDimension
-	 *            number of face-sampling steps along the longest dimension
 	 * @return the estimated pixel-space bounding interval
 	 */
 	private static RealInterval estimateBounds(
 			final AffineTransform3D pixelToPhysical,
 			final BiFunction<RealTransform, RealInterval, RealInterval> boundingBoxEstimator,
-			final RealTransform t,
-			final Interval interval)
+			final RealTransform transform,
+			final RealInterval interval)
 	{
 		/**
 		 * The total forward transformation needed for bounding box estimation is:
 		 * pixelToPhysical
-		 * t.inverse
+		 * transform.inverse
 		 * pixelToPhysical.inverse
 		 */
 		final RealInterval physical = pixelToPhysical.estimateBounds(interval);
-		final RealInterval transformedPhysical = boundingBoxEstimator.apply(directOrEstimatedInverse(t), physical);
+		final RealInterval transformedPhysical = boundingBoxEstimator.apply(directOrEstimatedInverse(transform), physical);
 		final FinalRealInterval transformedPixel = pixelToPhysical.inverse().estimateBounds(transformedPhysical);
 		return transformedPixel;
 	}
