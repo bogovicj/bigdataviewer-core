@@ -31,7 +31,6 @@ package bdv.tools.transformation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.Supplier;
 
 import bdv.viewer.Interpolation;
 import bdv.viewer.Source;
@@ -117,7 +116,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	 */
 	private List< Interval > boundingIntervals;
 
-	private final Supplier< Boolean > boundingBoxCullingSupplier;
+	private final boolean doBoundingBoxCulling;
 
 	/**
 	 * Wraps {@code source} with the given world-coordinate {@code transform},
@@ -139,7 +138,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 
 	/**
 	 * Wraps {@code source} with the given world-coordinate {@code transform},
-	 * using the suppliued bounding-box estimator, and inherits bounding-box
+	 * using the supplied bounding-box estimator, and inherits bounding-box
 	 * culling from {@code source}.
 	 *
 	 * @param source
@@ -173,17 +172,16 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	 *            estimates the world-space interval that {@link #getSource}
 	 *            rasterizes over, given the transform and the wrapped interval
 	 * @param doBoundingBoxCulling
-	 *            supplies the value returned by {@link #doBoundingBoxCulling()};
-	 *            if {@code null}, the wrapped source's setting is used
+	 *            if null, the wrapped source's setting is used
 	 */
 	public RealTransformedSource( final Source< T > source, final String name,
 		    final RealTransform transform,
 		    final BiFunction< RealTransform, RealInterval, RealInterval > boundingBoxEstimator,
-			final Supplier< Boolean > doBoundingBoxCulling )
+			final Boolean doBoundingBoxCulling )
 	{
 		this.source = source;
 		this.name = name;
-		this.boundingBoxCullingSupplier = doBoundingBoxCulling;
+		this.doBoundingBoxCulling = doBoundingBoxCulling == null ? source.doBoundingBoxCulling() : doBoundingBoxCulling;
 		setTransform( transform, boundingBoxEstimator );
 
 		sourceMipmapOrdering = MipmapOrdering.class.isInstance( source ) ?
@@ -199,10 +197,7 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 	@Override
 	public boolean doBoundingBoxCulling()
 	{
-		if( boundingBoxCullingSupplier != null )
-			return boundingBoxCullingSupplier.get();
-		else
-			return source.doBoundingBoxCulling();
+		return doBoundingBoxCulling;
 	}
 
 	/**
