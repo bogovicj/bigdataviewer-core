@@ -280,9 +280,8 @@ public class RealTransformedSource<T> implements Source<T>, MipmapOrdering
 			if (t instanceof AffineGet) {
 				// some AffineGet implementations ignore the IntervalSamplingMethod,
 				// but even if used, CORNERS is appropriate for an affine
-				return ((AffineGet)t).boundingInterval(i, IntervalSamplingMethod.CORNERS);
+				return t.boundingInterval(i, IntervalSamplingMethod.CORNERS);
 			}
-
 			return facesEstimator(i, numStepsLongestDimension).bounds(i, t);
 		};
 		return estimator;
